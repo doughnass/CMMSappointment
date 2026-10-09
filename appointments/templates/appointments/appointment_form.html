@@ -1,5 +1,5 @@
 {% extends "appointments/base.html" %}
-{% load static %}
+{% load appointments_extras %}
 {% block title %}{% if appointment %}แก้ไข{% else %}สร้าง{% endif %}นัดหมาย – CMMS{% endblock %}
 {% block breadcrumb %}
   <li class="breadcrumb-item"><a href="{% url 'appointments:appointment_list' %}">นัดหมาย</a></li>
@@ -8,7 +8,7 @@
 
 {% block extra_head %}
 <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
-<link href="{% static 'appointments/css/appointment_form.css' %}" rel="stylesheet">
+<style>{% inline_static 'appointments/css/appointment_form.css' %}</style>
 {% endblock %}
 
 {% block content %}
@@ -216,5 +216,5 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
-<script src="{% static 'appointments/js/appointment_form.js' %}"></script>
+<script>{% inline_static 'appointments/js/appointment_form.js' %}</script>
 {% endblock %}

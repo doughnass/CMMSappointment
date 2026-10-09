@@ -246,6 +246,35 @@ class RegressionTests(BaseCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual([r['name'] for r in response.json()['results']], ['Ventilator'])
 
+    def test_pages_render_styles_and_scripts_without_static_file_serving(self):
+        expected = {
+            'dashboard': ['.sidebar-backdrop'],
+            'schedule': ['#calendar-loading', 'FullCalendar.Calendar'],
+            'dispatch_board': ['.dispatch-scroll'],
+            'appointment_create': ['.tech-suggest-card', 'escapeHtml'],
+        }
+        for name, fragments in expected.items():
+            with self.subTest(page=name):
+                html = self.client.get(reverse(f'appointments:{name}')).content.decode()
+                self.assertNotIn('/static/appointments/', html)
+                self.assertIn('.sidebar-backdrop', html)
+                for fragment in fragments:
+                    self.assertIn(fragment, html)
+
+    def test_inlined_assets_cannot_close_their_element(self):
+        import os
+        import tempfile
+        from .templatetags.appointments_extras import _read_asset
+        with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False, encoding='utf-8') as handle:
+            handle.write("var a = '</script><b>';\nvar b = '</STYLE'.length;")
+            path = handle.name
+        try:
+            content = _read_asset(path, os.path.getmtime(path))
+        finally:
+            os.unlink(path)
+        self.assertNotIn('</script', content)
+        self.assertIn('<\\/script', content)
+
     def test_malformed_parameters_do_not_cause_server_errors(self):
         api = reverse('appointments:api_appointments')
         self.assertEqual(self.client.get(api, {'start': 'zzz'}).status_code, 400)

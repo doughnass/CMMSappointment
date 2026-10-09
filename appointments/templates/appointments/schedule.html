@@ -1,11 +1,11 @@
 {% extends "appointments/base.html" %}
-{% load static %}
+{% load appointments_extras %}
 {% block title %}ตารางนัดหมาย – CMMS{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item active">ตารางนัดหมาย</li>{% endblock %}
 
 {% block extra_head %}
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
-<link href="{% static 'appointments/css/schedule.css' %}" rel="stylesheet">
+<style>{% inline_static 'appointments/css/schedule.css' %}</style>
 {% endblock %}
 
 {% block content %}
@@ -84,5 +84,5 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/th.js"></script>
-<script src="{% static 'appointments/js/schedule.js' %}"></script>
+<script>{% inline_static 'appointments/js/schedule.js' %}</script>
 {% endblock %}

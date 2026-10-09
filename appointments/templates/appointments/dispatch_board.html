@@ -1,10 +1,10 @@
 {% extends "appointments/base.html" %}
-{% load static %}
+{% load appointments_extras %}
 {% block title %}กระดานจ่ายงาน – CMMS{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item active">กระดานจ่ายงาน</li>{% endblock %}
 
 {% block extra_head %}
-<link href="{% static 'appointments/css/dispatch_board.css' %}" rel="stylesheet">
+<style>{% inline_static 'appointments/css/dispatch_board.css' %}</style>
 {% endblock %}
 
 {% block content %}
