@@ -1,0 +1,149 @@
+{% extends "appointments/base.html" %}
+{% block title %}{% if technician %}แก้ไข{% else %}เพิ่ม{% endif %}ช่างเทคนิค – CMMS{% endblock %}
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'appointments:technician_list' %}">ช่างเทคนิค</a></li>
+  <li class="breadcrumb-item active">{% if technician %}{{ technician.full_name }}{% else %}เพิ่มช่างใหม่{% endif %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header fw-600">
+        <i class="bi bi-person-plus me-2 text-success"></i>
+        {% if technician %}แก้ไขข้อมูลช่าง{% else %}เพิ่มช่างเทคนิคใหม่{% endif %}
+      </div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <h6 class="text-muted border-bottom pb-2 mb-3">ข้อมูลส่วนตัว</h6>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="form-label fw-500">รหัสพนักงาน <span class="text-danger">*</span></label>
+              {{ form.employee_id }}
+              {% if form.employee_id.errors %}<div class="text-danger small">{{ form.employee_id.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-500">ชื่อ <span class="text-danger">*</span></label>
+              {{ form.first_name }}
+              {% if form.first_name.errors %}<div class="text-danger small">{{ form.first_name.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-500">นามสกุล <span class="text-danger">*</span></label>
+              {{ form.last_name }}
+              {% if form.last_name.errors %}<div class="text-danger small">{{ form.last_name.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-500">โทรศัพท์ <span class="text-danger">*</span></label>
+              {{ form.phone }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-500">อีเมล</label>
+              {{ form.email }}
+            </div>
+          </div>
+
+          <h6 class="text-muted border-bottom pb-2 mb-3">วันทำงานปกติ</h6>
+          <div class="row g-2 mb-3">
+            {% for choice in form.work_days %}
+            <div class="col-auto">
+              <div class="form-check form-check-inline border rounded px-3 py-2" style="cursor:pointer">
+                {{ choice.tag }}
+                <label class="form-check-label fw-500" for="{{ choice.id_for_label }}" style="cursor:pointer">
+                  {{ choice.choice_label }}
+                </label>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+
+          <h6 class="text-muted border-bottom pb-2 mb-3">ทักษะ</h6>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <div class="card border-0 bg-light-subtle h-100">
+                <div class="card-body">
+                  <div class="fw-500 mb-2">ทักษะสำหรับ PM</div>
+                  <div class="row g-2">
+                    {% for skill in form.pm_skills %}
+                    <div class="col-12">
+                      <div class="form-check">
+                        {{ skill.tag }}
+                        <label class="form-check-label" for="{{ skill.id_for_label }}">{{ skill.choice_label }}</label>
+                      </div>
+                    </div>
+                    {% empty %}
+                    <div class="col text-muted small">ยังไม่มีทักษะประเภท PM – เพิ่มได้ที่ <a href="/admin/appointments/skill/add/" target="_blank">Admin</a></div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card border-0 bg-info-subtle h-100">
+                <div class="card-body">
+                  <div class="fw-500 mb-2">ทักษะสำหรับ Calibration</div>
+                  <div class="row g-2">
+                    {% for skill in form.cal_skills %}
+                    <div class="col-12">
+                      <div class="form-check">
+                        {{ skill.tag }}
+                        <label class="form-check-label" for="{{ skill.id_for_label }}">{{ skill.choice_label }}</label>
+                      </div>
+                    </div>
+                    {% empty %}
+                    <div class="col text-muted small">ยังไม่มีทักษะประเภท Calibration – เพิ่มได้ที่ <a href="/admin/appointments/skill/add/" target="_blank">Admin</a></div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- <div class="col-md-4">
+              <div class="card border-0 bg-warning-subtle h-100">
+                <div class="card-body">
+                  <div class="fw-500 mb-2">ทักษะสำหรับซ่อม</div>
+                  <div class="row g-2">
+                    {% for skill in form.repair_skills %}
+                    <div class="col-12">
+                      <div class="form-check">
+                        {{ skill.tag }}
+                        <label class="form-check-label" for="{{ skill.id_for_label }}">{{ skill.choice_label }}</label>
+                      </div>
+                    </div>
+                    {% empty %}
+                    <div class="col text-muted small">ยังไม่มีทักษะประเภทซ่อม – เพิ่มได้ที่ <a href="/admin/appointments/skill/add/" target="_blank">Admin</a></div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div> -->
+          </div>
+
+          <h6 class="text-muted border-bottom pb-2 mb-3">ตั้งค่าอื่นๆ</h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-4">
+              <label class="form-label fw-500">สีปฏิทิน</label>
+              {{ form.color }}
+              <div class="form-text">ใช้แสดงในปฏิทินนัดหมาย</div>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check">
+                {{ form.is_active }}
+                <label class="form-check-label fw-500">ปฏิบัติงานอยู่</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-save me-1"></i> บันทึก
+            </button>
+            <a href="{% if technician %}{% url 'appointments:technician_detail' technician.pk %}{% else %}{% url 'appointments:technician_list' %}{% endif %}"
+               class="btn btn-outline-secondary">ยกเลิก</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

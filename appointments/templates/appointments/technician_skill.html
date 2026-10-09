@@ -1,0 +1,265 @@
+{% extends "appointments/base.html" %}
+{% block title %}ทักษะช่างตามความต้องการงาน – CMMS{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item active">ทักษะช่างตามภาระงาน</li>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+	.kpi-card {
+		border-left: 4px solid #0d6efd;
+	}
+	.status-dot {
+		width: 10px;
+		height: 10px;
+		border-radius: 999px;
+		display: inline-block;
+		margin-right: 6px;
+	}
+	.status-critical { background: #dc3545; }
+	.status-warning { background: #fd7e14; }
+	.status-covered { background: #198754; }
+	.matrix-cell {
+		text-align: center;
+		vertical-align: middle;
+		min-width: 90px;
+	}
+	.matrix-skill {
+		font-size: .8rem;
+		white-space: nowrap;
+	}
+	.kpi-green { border-left-color: #198754 !important; }
+	.kpi-red { border-left-color: #dc3545 !important; }
+	.kpi-gray { border-left-color: #6c757d !important; }
+	.days-select { width: 150px; }
+	.tiny-note { font-size: .78rem; }
+	.tech-col { min-width: 180px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+	<div>
+		<h5 class="mb-1"><i class="bi bi-diagram-3 me-2 text-primary"></i>ทักษะช่างตามความต้องการบำรุงรักษา/สอบเทียบ</h5>
+		<div class="text-muted small">วิเคราะห์จากทะเบียนเครื่องมือที่ใช้งานอยู่ และงานที่ถึงกำหนดภายใน {{ horizon_days }} วัน (ถึง {{ horizon_date|date:"d/m/Y" }})</div>
+	</div>
+
+	<form class="d-flex align-items-center gap-2" method="get">
+		<label class="small text-muted" for="id_days">ช่วงวิเคราะห์</label>
+		<select id="id_days" name="days" class="form-select form-select-sm days-select" onchange="this.form.submit()">
+			<option value="14" {% if horizon_days == 14 %}selected{% endif %}>14 วัน</option>
+			<option value="30" {% if horizon_days == 30 %}selected{% endif %}>30 วัน</option>
+			<option value="60" {% if horizon_days == 60 %}selected{% endif %}>60 วัน</option>
+			<option value="90" {% if horizon_days == 90 %}selected{% endif %}>90 วัน</option>
+		</select>
+	</form>
+</div>
+
+<div class="row g-3 mb-3">
+	<div class="col-md-3">
+		<div class="card kpi-card h-100">
+			<div class="card-body">
+				<div class="text-muted small">เครื่องมือในทะเบียน (ใช้งาน)</div>
+				<div class="fs-4 fw-bold">{{ equipment_total }}</div>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-3">
+		<div class="card kpi-card kpi-green h-100">
+			<div class="card-body">
+				<div class="text-muted small">ทักษะที่ถูกใช้งานจริง</div>
+				<div class="fs-4 fw-bold">{{ total_required_skills }}</div>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-3">
+		<div class="card kpi-card kpi-red h-100">
+			<div class="card-body">
+				<div class="text-muted small">ช่องว่างวิกฤต</div>
+				<div class="fs-4 fw-bold text-danger">{{ critical_gap_count }}</div>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-3">
+		<div class="card kpi-card kpi-gray h-100">
+			<div class="card-body">
+				<div class="text-muted small">เครื่องมือยังไม่กำหนดทักษะ</div>
+				<div class="fs-4 fw-bold">{{ unclassified_count }}</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="row g-3">
+	<div class="col-lg-7">
+		<div class="card h-100">
+			<div class="card-header">
+				<i class="bi bi-tools me-2"></i>ความต้องการทักษะจากงาน PM/CAL
+			</div>
+			<div class="card-body p-0">
+				<div class="table-responsive">
+					<table class="table table-hover mb-0 small align-middle">
+						<thead class="table-light">
+							<tr>
+								<th>ทักษะ</th>
+								<th class="text-center">เครื่องมือ</th>
+								<th class="text-center">งาน PM ถึงกำหนด</th>
+								<th class="text-center">งาน CAL ถึงกำหนด</th>
+								<th class="text-center">ช่างที่มีทักษะ</th>
+								<th>สถานะครอบคลุม</th>
+							</tr>
+						</thead>
+						<tbody>
+							{% for row in skill_rows %}
+							<tr>
+								<td>
+									<div class="fw-500">{{ row.skill.name }}</div>
+									{% if row.samples %}
+									<div class="text-muted tiny-note">
+										เช่น {{ row.samples|join:", " }}
+									</div>
+									{% endif %}
+								</td>
+								<td class="text-center">{{ row.equipment_count }}</td>
+								<td class="text-center">
+									{{ row.pm_due_count }}
+									{% if row.pm_overdue_count > 0 %}
+									<span class="badge bg-danger-subtle text-danger border border-danger-subtle">ค้าง {{ row.pm_overdue_count }}</span>
+									{% endif %}
+								</td>
+								<td class="text-center">
+									{{ row.cal_due_count }}
+									{% if row.cal_overdue_count > 0 %}
+									<span class="badge bg-danger-subtle text-danger border border-danger-subtle">ค้าง {{ row.cal_overdue_count }}</span>
+									{% endif %}
+								</td>
+								<td class="text-center">{{ row.technician_count }}</td>
+								<td>
+									{% if row.coverage_status == 'critical' %}
+									<span class="status-dot status-critical"></span><span class="text-danger fw-500">วิกฤต (ไม่มีผู้เชี่ยวชาญ)</span>
+									{% elif row.coverage_status == 'warning' %}
+									<span class="status-dot status-warning"></span><span class="text-warning-emphasis fw-500">เฝ้าระวัง (กำลังคนต่ำ)</span>
+									{% else %}
+									<span class="status-dot status-covered"></span><span class="text-success fw-500">ครอบคลุม</span>
+									{% endif %}
+								</td>
+							</tr>
+							{% empty %}
+							<tr>
+								<td colspan="6" class="text-center text-muted py-4">ยังไม่มีข้อมูลทักษะที่ผูกกับทะเบียนเครื่องมือ</td>
+							</tr>
+							{% endfor %}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-lg-5">
+		<div class="card mb-3">
+			<div class="card-header"><i class="bi bi-person-lines-fill me-2"></i>ความพร้อมรายช่าง</div>
+			<div class="card-body p-0">
+				<div class="table-responsive">
+					<table class="table table-hover mb-0 small align-middle">
+						<thead class="table-light">
+							<tr>
+								<th>ช่าง</th>
+								<th class="text-center">Coverage</th>
+								<th>ทักษะเร่งด่วนที่ควรเพิ่ม</th>
+							</tr>
+						</thead>
+						<tbody>
+							{% for row in technician_rows %}
+							<tr>
+								<td>
+									<a class="text-decoration-none fw-500" href="{% url 'appointments:technician_detail' row.technician.pk %}">
+										{{ row.technician.full_name }}
+									</a>
+									<div class="text-muted">{{ row.technician.employee_id }}</div>
+								</td>
+								<td class="text-center">
+									<div class="fw-500">{{ row.coverage_pct }}%</div>
+									<div class="text-muted tiny-note">{{ row.matched_count }}/{{ total_required_skills }} ทักษะ</div>
+								</td>
+								<td>
+									{% if row.priority_missing %}
+										{% for s in row.priority_missing %}
+										<span class="badge bg-warning-subtle text-dark border border-warning-subtle me-1 mb-1">{{ s.name }}</span>
+										{% endfor %}
+									{% else %}
+										<span class="text-muted">ไม่มีประเด็นเร่งด่วน</span>
+									{% endif %}
+								</td>
+							</tr>
+							{% empty %}
+							<tr><td colspan="3" class="text-center text-muted py-4">ยังไม่มีช่างในระบบ</td></tr>
+							{% endfor %}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+
+		<div class="card">
+			<div class="card-header"><i class="bi bi-exclamation-octagon me-2 text-danger"></i>เครื่องมือที่ยังไม่ระบุทักษะ</div>
+			<div class="card-body">
+				{% if unclassified_count > 0 %}
+					<div class="text-muted small mb-2">พบ {{ unclassified_count }} รายการ ควรกำหนดทักษะที่ต้องใช้เพื่อให้ระบบจัดสรรช่างได้แม่นยำ</div>
+					<ul class="small mb-0">
+						{% for equip in unclassified_equipment %}
+						<li>
+							<a href="{% url 'appointments:equipment_detail' equip.pk %}" class="text-decoration-none">
+								{{ equip.name }} ({{ equip.serial_number }})
+							</a>
+						</li>
+						{% endfor %}
+					</ul>
+				{% else %}
+					<div class="text-success small"><i class="bi bi-check-circle me-1"></i>กำหนดทักษะให้เครื่องมือครบแล้ว</div>
+				{% endif %}
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="card mt-3">
+	<div class="card-header"><i class="bi bi-grid-3x3-gap me-2"></i>Skill Matrix (ช่าง x ทักษะที่ใช้จริง)</div>
+	<div class="card-body p-0">
+		<div class="table-responsive">
+			<table class="table table-sm table-bordered mb-0 align-middle">
+				<thead class="table-light">
+					<tr>
+						<th class="tech-col">ช่างเทคนิค</th>
+						{% for skill in required_skills %}
+						<th class="matrix-cell matrix-skill">{{ skill.name }}</th>
+						{% empty %}
+						<th class="matrix-cell">ไม่มีทักษะที่ผูกกับทะเบียน</th>
+						{% endfor %}
+					</tr>
+				</thead>
+				<tbody>
+					{% for row in technician_rows %}
+					<tr>
+						<td class="fw-500">{{ row.technician.full_name }}</td>
+						{% for skill in required_skills %}
+						<td class="matrix-cell">
+							{% if skill.pk in row.owned_skill_ids %}
+							<span class="badge bg-success-subtle text-success border border-success-subtle">มี</span>
+							{% else %}
+							<span class="badge bg-light text-muted border">-</span>
+							{% endif %}
+						</td>
+						{% empty %}
+						<td class="matrix-cell text-muted">ยังไม่มีข้อมูล</td>
+						{% endfor %}
+					</tr>
+					{% empty %}
+					<tr><td colspan="2" class="text-center text-muted py-3">ยังไม่มีข้อมูลช่าง</td></tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</div>
+	</div>
+</div>
+{% endblock %}

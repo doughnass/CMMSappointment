@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}CMMS นัดหมายบำรุงรักษา{% endblock %}</title>
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- Google Fonts: Sarabun (Thai) -->
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --sidebar-w: 240px;
+      --sidebar-bg: #1c2e4a;
+      --sidebar-hover: rgba(255,255,255,.12);
+      --sidebar-active: rgba(99,179,237,.25);
+      --topbar-h: 56px;
+    }
+    *, body { font-family: 'Sarabun', sans-serif; }
+    body { background: #f0f4f8; overflow-x: hidden; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-height: 100vh;
+      background: var(--sidebar-bg);
+      position: fixed; top: 0; left: 0; z-index: 200;
+      display: flex; flex-direction: column;
+      transition: transform .3s;
+    }
+    .sidebar-brand {
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .sidebar-brand .brand-title { color: #fff; font-weight: 700; font-size: 1rem; }
+    .sidebar-brand .brand-sub   { color: rgba(255,255,255,.5); font-size: .75rem; }
+    .sidebar .nav-label {
+      color: rgba(255,255,255,.35);
+      font-size: .65rem; letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 14px 18px 4px;
+    }
+    .sidebar .nav-link {
+      color: rgba(255,255,255,.7);
+      padding: 9px 18px;
+      border-radius: 8px;
+      margin: 1px 8px;
+      font-size: .9rem;
+      transition: all .15s;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .sidebar .nav-link:hover  { background: var(--sidebar-hover); color: #fff; }
+    .sidebar .nav-link.active { background: var(--sidebar-active); color: #fff; font-weight: 600; }
+    .sidebar .nav-link i { width: 18px; text-align: center; flex-shrink: 0; }
+    .sidebar-footer { margin-top: auto; padding: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+    .sidebar-footer .admin-btn {
+      border-color: rgba(255,255,255,.2);
+    }
+
+    /* ── Main ── */
+    .main-content { margin-left: var(--sidebar-w); min-height: 100vh; }
+    .topbar {
+      position: sticky; top: 0; z-index: 100;
+      background: #fff;
+      height: var(--topbar-h);
+      border-bottom: 1px solid #e2e8f0;
+      display: flex; align-items: center;
+      padding: 0 24px;
+      gap: 12px;
+    }
+    .page-body { padding: 24px; }
+
+    /* ── Cards & utilities ── */
+    .card { border: none; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.07); }
+    .card-header { background: transparent; border-bottom: 1px solid #e2e8f0; font-weight: 600; }
+    .stat-card { border-left: 4px solid; }
+    .stat-card .stat-icon { width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; }
+    .badge-overdue  { background: #dc3545 !important; }
+    .badge-due_soon { background: #fd7e14 !important; }
+    .badge-ok       { background: #198754 !important; }
+    .badge-unknown  { background: #6c757d !important; }
+
+    /* Table tweaks */
+    .table > :not(caption) > * > * { padding: .55rem .75rem; }
+    .table-hover tbody tr:hover { background: #f8fbff; }
+
+    /* Time-type badge */
+    .badge-office   { background: #0d6efd22; color: #0d6efd; border: 1px solid #0d6efd55; }
+    .badge-overtime { background: #fd7e1422; color: #e96c00; border: 1px solid #fd7e1455; }
+    .badge-weekend  { background: #6f42c122; color: #6f42c1; border: 1px solid #6f42c155; }
+
+    /* Font weight utilities Bootstrap doesn't include */
+    .fw-500 { font-weight: 500 !important; }
+    .fw-600 { font-weight: 600 !important; }
+
+    @media (max-width: 767.98px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.show { transform: translateX(0); }
+      .main-content { margin-left: 0; }
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- ═══ Sidebar ═══ -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <i class="bi bi-wrench-adjustable-circle-fill text-info fs-5"></i>
+      <span class="brand-title">CMMS Appointment</span>
+    </div>
+    <div class="brand-sub">ระบบนัดหมายบำรุงรักษาเครื่องมือแพทย์</div>
+  </div>
+
+  <ul class="nav flex-column pt-2 flex-grow-1">
+    <li><a href="{% url 'appointments:dashboard' %}"
+           class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+      <i class="bi bi-speedometer2"></i> หน้าหลัก
+    </a></li>
+
+    <li><a href="{% url 'appointments:schedule' %}"
+           class="nav-link {% if request.resolver_match.url_name == 'schedule' %}active{% endif %}">
+      <i class="bi bi-calendar3-week"></i> ตารางนัดหมาย
+    </a></li>
+
+    <li><a href="{% url 'appointments:appointment_list' %}"
+           class="nav-link {% if 'appointment' in request.resolver_match.url_name and request.resolver_match.url_name != 'appointment_create' %}active{% endif %}">
+      <i class="bi bi-list-check"></i> รายการนัดหมาย
+    </a></li>
+    <li><a href="{% url 'appointments:dispatch_board' %}"
+           class="nav-link {% if request.resolver_match.url_name == 'dispatch_board' %}active{% endif %}">
+      <i class="bi bi-kanban"></i> กระดานจ่ายงาน
+    </a></li>
+
+    <li><a href="{% url 'appointments:ot_schedule' %}"
+           class="nav-link {% if request.resolver_match.url_name == 'ot_schedule' %}active{% endif %}">
+      <i class="bi bi-moon-stars text-warning"></i> ตารางนอกเวลา
+    </a></li>
+    <li><a href="{% url 'appointments:appointment_create' %}"
+           class="nav-link {% if request.resolver_match.url_name == 'appointment_create' %}active{% endif %}">
+      <i class="bi bi-plus-circle"></i> สร้างนัดหมาย
+    </a></li>
+
+    <li class="nav-label">เครื่องมือแพทย์</li>
+
+    <li><a href="{% url 'appointments:equipment_list' %}"
+           class="nav-link {% if 'equipment' in request.resolver_match.url_name %}active{% endif %}">
+      <i class="bi bi-heart-pulse"></i> เครื่องมือแพทย์
+    </a></li>
+
+    <li><a href="{% url 'appointments:equipment_list' %}?filter=overdue"
+           class="nav-link">
+      <i class="bi bi-exclamation-triangle text-danger"></i> ครบกำหนด PM
+    </a></li>
+
+    <li class="nav-label">บุคลากร</li>
+
+    <li><a href="{% url 'appointments:technician_list' %}"
+           class="nav-link {% if 'technician' in request.resolver_match.url_name %}active{% endif %}">
+      <i class="bi bi-people"></i> ช่างเทคนิค
+    </a></li>
+
+        <li><a href="{% url 'appointments:technician_skill' %}"
+          class="nav-link {% if request.resolver_match.url_name == 'technician_skill' %}active{% endif %}">
+          <i class="bi bi-diagram-3"></i> ทักษะช่างตามภาระงาน
+        </a></li>
+
+    <li><a href="{% url 'appointments:customer_list' %}"
+           class="nav-link {% if 'customer' in request.resolver_match.url_name %}active{% endif %}">
+      <i class="bi bi-hospital"></i> ลูกค้า / โรงพยาบาล
+    </a></li>
+
+    <li class="nav-label">รายงาน</li>
+
+    <li><a href="{% url 'appointments:reports' %}"
+           class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
+      <i class="bi bi-bar-chart-line"></i> รายงานสรุป
+    </a></li>
+  </ul>
+
+  <div class="sidebar-footer">
+    <a href="/admin/" class="btn btn-sm btn-outline-secondary w-100 text-white-50 admin-btn">
+      <i class="bi bi-gear"></i> ผู้ดูแลระบบ
+    </a>
+  </div>
+</nav>
+
+<!-- ═══ Main Content ═══ -->
+<div class="main-content">
+  <!-- Topbar -->
+  <div class="topbar">
+    <button class="btn btn-sm btn-light d-md-none me-1" onclick="document.getElementById('sidebar').classList.toggle('show')" title="เปิด/ปิดเมนู" aria-label="เปิดหรือปิดเมนูด้านข้าง">
+      <i class="bi bi-list fs-5"></i>
+    </button>
+    <nav aria-label="breadcrumb" class="flex-grow-1">
+      <ol class="breadcrumb mb-0 small"><li class="breadcrumb-item"><a href="{% url 'appointments:dashboard' %}" class="text-decoration-none">หน้าหลัก</a></li>{% block breadcrumb %}{% endblock %}</ol>
+    </nav>
+    <span class="text-muted small d-none d-md-inline" id="js-date"></span>
+    <a href="{% url 'appointments:appointment_create' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg"></i> นัดหมายใหม่
+    </a>
+  </div>
+
+  <!-- Flash Messages -->
+  <div class="page-body pb-0">
+    {% if messages %}
+      {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show py-2" role="alert">
+        <i class="bi bi-check-circle-fill me-1"></i> {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" title="ปิดข้อความ" aria-label="ปิดข้อความแจ้งเตือน"></button>
+      </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <!-- Page Content -->
+  <div class="page-body">
+    {% block content %}{% endblock %}
+  </div>
+</div><!-- /main-content -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Show current date in topbar
+  const d = new Date();
+  document.getElementById('js-date').textContent =
+    d.toLocaleDateString('th-TH', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

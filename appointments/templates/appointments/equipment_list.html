@@ -1,0 +1,203 @@
+{% extends "appointments/base.html" %}
+{% block title %}เครื่องมือแพทย์ – CMMS{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">เครื่องมือแพทย์</li>{% endblock %}
+
+{% block content %}
+
+<!-- Header + Actions -->
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <h5 class="mb-0"><i class="bi bi-heart-pulse me-2 text-primary"></i>รายการเครื่องมือแพทย์</h5>
+  <div class="d-flex gap-2">
+    <a href="{% url 'appointments:customer_create' %}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-hospital"></i> เพิ่มลูกค้า
+    </a>
+    <a href="{% url 'appointments:equipment_import' %}" class="btn btn-sm btn-outline-success">
+      <i class="bi bi-file-earmark-excel"></i> นำเข้า Excel
+    </a>
+    <a href="{% url 'appointments:equipment_create' %}" class="btn btn-sm btn-primary">
+      <i class="bi bi-plus-lg"></i> เพิ่มเครื่องมือ
+    </a>
+  </div>
+</div>
+
+<!-- Filter tabs -->
+<div class="card mb-3">
+  <div class="card-body py-2 px-3">
+    <div class="row g-2 align-items-center">
+      <!-- Status filter -->
+      <div class="col-auto">
+        <div class="btn-group btn-group-sm" role="group">
+          <a href="?filter=all{% if search %}&search={{ search }}{% endif %}{% if request.GET.customer %}&customer={{ request.GET.customer }}{% endif %}"
+             class="btn {% if filter_type == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+            ทั้งหมด
+          </a>
+          <a href="?filter=overdue{% if search %}&search={{ search }}{% endif %}"
+             class="btn {% if filter_type == 'overdue' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+            เกินกำหนด
+            {% if overdue_count > 0 %}
+            <span class="badge bg-white text-danger ms-1">{{ overdue_count }}</span>
+            {% endif %}
+          </a>
+          <a href="?filter=due_soon{% if search %}&search={{ search }}{% endif %}"
+             class="btn {% if filter_type == 'due_soon' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+            ครบใน 30 วัน
+            {% if due_soon_count > 0 %}
+            <span class="badge bg-white text-warning ms-1">{{ due_soon_count }}</span>
+            {% endif %}
+          </a>
+          <a href="?filter=calibration{% if search %}&search={{ search }}{% endif %}"
+             class="btn {% if filter_type == 'calibration' %}btn-info{% else %}btn-outline-info{% endif %}">
+            ต้องสอบเทียบ
+          </a>
+        </div>
+      </div>
+      <!-- Search -->
+      <div class="col">
+        <form method="get" class="d-flex gap-2">
+          <input type="hidden" name="filter" value="{{ filter_type }}">
+          {% if request.GET.customer %}<input type="hidden" name="customer" value="{{ request.GET.customer }}">{% endif %}
+          <input type="text" class="form-control form-control-sm" name="search"
+                 placeholder="ค้นหาชื่อ / S/N / โรงพยาบาล…" value="{{ search }}">
+          <button class="btn btn-sm btn-outline-secondary" type="submit">
+            <i class="bi bi-search"></i>
+          </button>
+          {% if search %}
+          <a href="?filter={{ filter_type }}" class="btn btn-sm btn-outline-danger" title="ล้าง">
+            <i class="bi bi-x-lg"></i>
+          </a>
+          {% endif %}
+        </form>
+      </div>
+      <!-- Customer filter -->
+      <div class="col-auto">
+        <form method="get">
+          <input type="hidden" name="filter" value="{{ filter_type }}">
+          {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
+          <select name="customer" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">— ทุกโรงพยาบาล —</option>
+            {% for c in customers %}
+            <option value="{{ c.pk }}" {% if request.GET.customer == c.pk|stringformat:"i" %}selected{% endif %}>
+              {{ c.name|truncatechars:30 }}
+            </option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>S/N / ชื่อเครื่องมือ</th>
+            <th>โรงพยาบาล / แผนก</th>
+            <th>PM (นาที)</th>
+            <th>PM ถัดไป</th>
+            <th>สอบเทียบ</th>
+            <th>สอบเทียบถัดไป</th>
+            <th class="text-center">การดำเนินการ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for eq in equipment_list %}
+          <tr>
+            <td>
+              <a href="{% url 'appointments:equipment_detail' eq.pk %}" class="fw-600 text-decoration-none">
+                {{ eq.name }}
+              </a>
+              <div class="text-muted small">S/N: {{ eq.serial_number }}
+                {% if eq.asset_number %} | {{ eq.asset_number }}{% endif %}
+              </div>
+              {% if eq.category %}<span class="badge bg-light text-dark border small">{{ eq.category }}</span>{% endif %}
+            </td>
+            <td>
+              <div class="small">{{ eq.customer.name }}</div>
+              {% if eq.department %}<div class="text-muted small">{{ eq.department }}</div>{% endif %}
+            </td>
+            <td class="text-center">
+              {{ eq.maintenance_duration_minutes }} นาที
+              {% if eq.requires_calibration and eq.calibration_duration_minutes %}
+              <div class="text-muted small">+ {{ eq.calibration_duration_minutes }} (CAL)</div>
+              {% endif %}
+            </td>
+            <!-- PM Status -->
+            <td>
+              {% if eq.next_maintenance_date %}
+                {% if eq.maintenance_status == 'overdue' %}
+                  <span class="badge bg-danger">เกินกำหนด</span><br>
+                  <span class="text-danger small">{{ eq.next_maintenance_date|date:"d/m/Y" }}</span>
+                {% elif eq.maintenance_status == 'due_soon' %}
+                  <span class="badge bg-warning text-dark">ครบใน {{ eq.days_until_maintenance }} วัน</span><br>
+                  <span class="text-muted small">{{ eq.next_maintenance_date|date:"d/m/Y" }}</span>
+                {% else %}
+                  <span class="text-muted small">{{ eq.next_maintenance_date|date:"d/m/Y" }}</span>
+                  <div class="text-success small">{{ eq.days_until_maintenance }} วัน</div>
+                {% endif %}
+              {% else %}
+                <span class="text-muted small">ไม่ระบุ</span>
+              {% endif %}
+            </td>
+            <!-- Calibration Status -->
+            <td class="text-center">
+              {% if eq.requires_calibration %}
+                <span class="badge bg-info text-dark">ต้องสอบเทียบ</span>
+              {% else %}
+                <span class="text-muted small">–</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if eq.requires_calibration and eq.next_calibration_date %}
+                {% if eq.calibration_status == 'overdue' %}
+                  <span class="badge bg-danger">เกินกำหนด</span><br>
+                  <span class="text-danger small">{{ eq.next_calibration_date|date:"d/m/Y" }}</span>
+                {% elif eq.calibration_status == 'due_soon' %}
+                  <span class="badge bg-warning text-dark">ครบใน {{ eq.days_until_calibration }} วัน</span><br>
+                  <span class="text-muted small">{{ eq.next_calibration_date|date:"d/m/Y" }}</span>
+                {% else %}
+                  <span class="text-muted small">{{ eq.next_calibration_date|date:"d/m/Y" }}</span>
+                {% endif %}
+              {% else %}
+                <span class="text-muted small">–</span>
+              {% endif %}
+            </td>
+            <td class="text-center text-nowrap">
+              <a href="{% url 'appointments:appointment_create' %}?equipment_id={{ eq.pk }}"
+                 class="btn btn-sm btn-success py-0 px-2" title="สร้างนัดหมาย">
+                <i class="bi bi-calendar-plus"></i>
+              </a>
+              <a href="{% url 'appointments:equipment_detail' eq.pk %}"
+                 class="btn btn-sm btn-outline-secondary py-0 px-2" title="รายละเอียด">
+                <i class="bi bi-eye"></i>
+              </a>
+              <a href="{% url 'appointments:equipment_update' eq.pk %}"
+                 class="btn btn-sm btn-outline-primary py-0 px-2" title="แก้ไข">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="{% url 'appointments:equipment_delete' eq.pk %}" class="d-inline"
+                    onsubmit="return confirm('ยืนยันลบทะเบียน {{ eq.name }}?')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="ลบ">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-5">
+              <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+              ไม่พบเครื่องมือ
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

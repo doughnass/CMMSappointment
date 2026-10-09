@@ -1,0 +1,124 @@
+{% extends "appointments/base.html" %}
+{% block title %}นำเข้าเครื่องมือแพทย์ – CMMS{% endblock %}
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'appointments:equipment_list' %}">เครื่องมือแพทย์</a></li>
+  <li class="breadcrumb-item active">นำเข้าจาก Excel</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+
+    <!-- Upload card -->
+    <div class="card mb-4">
+      <div class="card-header fw-600">
+        <i class="bi bi-file-earmark-excel me-2 text-success"></i>นำเข้าเครื่องมือแพทย์จาก Excel
+      </div>
+      <div class="card-body">
+
+        <div class="alert alert-info d-flex align-items-start gap-2 mb-4" role="alert">
+          <i class="bi bi-info-circle-fill mt-1 flex-shrink-0"></i>
+          <div>
+            <strong>ขั้นตอน:</strong>
+            <ol class="mb-0 mt-1">
+              <li>ดาวน์โหลด template Excel แล้วกรอกข้อมูล</li>
+              <li>คอลัมน์ที่มี <span class="text-danger fw-bold">*</span> คือบังคับกรอก</li>
+              <li>รหัสลูกค้า (customer_code) ต้องมีอยู่ในระบบก่อน</li>
+              <li>ถ้า SerialNo ซ้ำ ระบบจะ <strong>อัปเดต</strong> แถวนั้น</li>
+              <li>อัปโหลดไฟล์ .xlsx แล้วกด "นำเข้า"</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <a href="{% url 'appointments:equipment_import_template' %}" class="btn btn-outline-success">
+            <i class="bi bi-download me-1"></i> ดาวน์โหลด Template Excel
+          </a>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" novalidate>
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label fw-500">เลือกไฟล์ Excel (.xlsx) <span class="text-danger">*</span></label>
+            <input type="file" name="excel_file" accept=".xlsx" class="form-control" required>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-upload me-1"></i> นำเข้า
+            </button>
+            <a href="{% url 'appointments:equipment_list' %}" class="btn btn-outline-secondary">ยกเลิก</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Results card (shown after import) -->
+    {% if created is not None or updated is not None %}
+    <div class="card">
+      <div class="card-header fw-600">
+        <i class="bi bi-clipboard-data me-2"></i>ผลการนำเข้า
+      </div>
+      <div class="card-body">
+        <div class="row text-center g-3 mb-4">
+          <div class="col-4">
+            <div class="card border-success h-100">
+              <div class="card-body py-3">
+                <div class="display-6 fw-bold text-success">{{ created }}</div>
+                <div class="small text-muted">สร้างใหม่</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="card border-primary h-100">
+              <div class="card-body py-3">
+                <div class="display-6 fw-bold text-primary">{{ updated }}</div>
+                <div class="small text-muted">อัปเดต</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="card border-warning h-100">
+              <div class="card-body py-3">
+                <div class="display-6 fw-bold text-warning">{{ skipped }}</div>
+                <div class="small text-muted">ข้ามแถว</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {% if row_errors %}
+        <h6 class="text-danger mb-2"><i class="bi bi-exclamation-triangle me-1"></i>แถวที่มีปัญหา</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered">
+            <thead class="table-danger">
+              <tr>
+                <th>แถวที่</th>
+                <th>Serial No</th>
+                <th>ข้อผิดพลาด</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for e in row_errors %}
+              <tr>
+                <td>{{ e.row }}</td>
+                <td>{{ e.serial }}</td>
+                <td>{{ e.errors|join:", " }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {% if created or updated %}
+        <a href="{% url 'appointments:equipment_list' %}" class="btn btn-success mt-2">
+          <i class="bi bi-list-ul me-1"></i> ดูรายการเครื่องมือ
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

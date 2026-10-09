@@ -1,0 +1,183 @@
+{% extends "appointments/base.html" %}
+{% block title %}{{ equipment.name }} – CMMS{% endblock %}
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'appointments:equipment_list' %}">เครื่องมือแพทย์</a></li>
+  <li class="breadcrumb-item active">{{ equipment.name }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+
+  <!-- Left: Equipment info -->
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-heart-pulse text-primary me-2"></i>ข้อมูลเครื่องมือ</span>
+        <a href="{% url 'appointments:equipment_update' equipment.pk %}" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-pencil"></i> แก้ไข
+        </a>
+        <form method="post" action="{% url 'appointments:equipment_delete' equipment.pk %}" class="d-inline"
+              onsubmit="return confirm('ยืนยันลบทะเบียน {{ equipment.name }}?')">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-trash"></i> ลบ
+          </button>
+        </form>
+      </div>
+      <div class="card-body">
+        <h5 class="fw-bold">{{ equipment.name }}</h5>
+        {% if equipment.name_th %}
+        <p class="mb-1 text-muted">{{ equipment.name_th }}</p>
+        {% endif %}
+        <p class="text-muted mb-3">{{ equipment.manufacturer }} {{ equipment.model }}</p>
+
+        <dl class="row small mb-0">
+          {% if equipment.equipment_code %}
+          <dt class="col-5 text-muted">รหัสเครื่อง</dt>
+          <dd class="col-7 fw-500">{{ equipment.equipment_code }}</dd>
+          {% endif %}
+          <dt class="col-5 text-muted">Serial No.</dt>
+          <dd class="col-7 fw-500">{{ equipment.serial_number }}</dd>
+          {% if equipment.asset_number %}
+          <dt class="col-5 text-muted">เลขครุภัณฑ์</dt>
+          <dd class="col-7">{{ equipment.asset_number }}</dd>
+          {% endif %}
+          <dt class="col-5 text-muted">ประเภท</dt>
+          <dd class="col-7">{{ equipment.category|default:"–" }}</dd>
+          <dt class="col-5 text-muted">หน่วยงานในระบบ</dt>
+          <dd class="col-7">{{ equipment.customer.name }}</dd>
+          <dt class="col-5 text-muted">หน่วยงานเจ้าของเครื่อง</dt>
+          <dd class="col-7">{{ equipment.owner_unit_name|default:"–" }}</dd>
+          <dt class="col-5 text-muted">หน่วยงานที่ใช้เครื่อง</dt>
+          <dd class="col-7">{{ equipment.user_unit_name|default:"–" }}</dd>
+          <dt class="col-5 text-muted">ภาควิชา/ฝ่าย/งาน</dt>
+          <dd class="col-7">{{ equipment.department|default:"–" }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- PM Card -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-tools me-2"></i>การบำรุงรักษา (PM)</div>
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="text-muted small">PM ครั้งถัดไป</span>
+          {% if equipment.maintenance_status == 'overdue' %}
+            <span class="badge bg-danger fs-6">{{ equipment.next_maintenance_date|date:"d/m/Y"|default:"ไม่ระบุ" }}</span>
+          {% elif equipment.maintenance_status == 'due_soon' %}
+            <span class="badge bg-warning text-dark fs-6">{{ equipment.next_maintenance_date|date:"d/m/Y" }}</span>
+          {% else %}
+            <span class="fw-500">{{ equipment.next_maintenance_date|date:"d/m/Y"|default:"ไม่ระบุ" }}</span>
+          {% endif %}
+        </div>
+        <dl class="row small mb-0">
+          <dt class="col-7 text-muted">PM ล่าสุด</dt>
+          <dd class="col-5">{{ equipment.last_maintenance_date|date:"d/m/Y"|default:"–" }}</dd>
+          <dt class="col-7 text-muted">รอบ PM</dt>
+          <dd class="col-5">{{ equipment.maintenance_interval_months }} เดือน</dd>
+          <dt class="col-7 text-muted">ใช้เวลา</dt>
+          <dd class="col-5">{{ equipment.maintenance_duration_minutes }} นาที</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Calibration Card -->
+    {% if equipment.requires_calibration %}
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-rulers me-2 text-info"></i>การสอบเทียบ (Calibration)</div>
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="text-muted small">สอบเทียบครั้งถัดไป</span>
+          {% if equipment.calibration_status == 'overdue' %}
+            <span class="badge bg-danger">{{ equipment.next_calibration_date|date:"d/m/Y"|default:"ไม่ระบุ" }}</span>
+          {% elif equipment.calibration_status == 'due_soon' %}
+            <span class="badge bg-warning text-dark">{{ equipment.next_calibration_date|date:"d/m/Y" }}</span>
+          {% else %}
+            <span class="fw-500">{{ equipment.next_calibration_date|date:"d/m/Y"|default:"ไม่ระบุ" }}</span>
+          {% endif %}
+        </div>
+        <dl class="row small mb-0">
+          <dt class="col-7 text-muted">สอบเทียบล่าสุด</dt>
+          <dd class="col-5">{{ equipment.last_calibration_date|date:"d/m/Y"|default:"–" }}</dd>
+          <dt class="col-7 text-muted">รอบสอบเทียบ</dt>
+          <dd class="col-5">{{ equipment.calibration_interval_months|default:"–" }} เดือน</dd>
+          <dt class="col-7 text-muted">ใช้เวลา</dt>
+          <dd class="col-5">{{ equipment.calibration_duration_minutes|default:"–" }} นาที</dd>
+        </dl>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-lightning me-2 text-warning"></i>ทักษะที่ต้องใช้</div>
+      <div class="card-body">
+        <div class="small fw-500 mb-1">สำหรับ PM</div>
+        <div class="d-flex flex-wrap gap-1 mb-3">
+          {% for skill in equipment.maintenance_required_skills.all %}
+          <span class="badge bg-light text-dark border">{{ skill.name }}</span>
+          {% empty %}
+          <span class="text-muted small">ยังไม่ระบุ</span>
+          {% endfor %}
+        </div>
+
+        {% if equipment.requires_calibration %}
+        <div class="small fw-500 mb-1">สำหรับ Calibration</div>
+        <div class="d-flex flex-wrap gap-1">
+          {% for skill in equipment.calibration_required_skills.all %}
+          <span class="badge bg-info-subtle text-dark border border-info-subtle">{{ skill.name }}</span>
+          {% empty %}
+          <span class="text-muted small">ยังไม่ระบุ</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <a href="{% url 'appointments:appointment_create' %}?equipment_id={{ equipment.pk }}"
+       class="btn btn-success w-100">
+      <i class="bi bi-calendar-plus me-1"></i> สร้างนัดหมาย
+    </a>
+  </div>
+
+  <!-- Right: Appointment history -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-clock-history me-2"></i>ประวัติการนัดหมาย</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 small">
+            <thead class="table-light">
+              <tr>
+                <th>เลขที่</th>
+                <th>วันที่</th>
+                <th>ช่าง</th>
+                <th>ประเภท</th>
+                <th>เวลา</th>
+                <th>สถานะ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for apt in appointments %}
+              <tr onclick="location.href='{% url 'appointments:appointment_detail' apt.pk %}'" style="cursor:pointer">
+                <td class="fw-500">{{ apt.appointment_no }}</td>
+                <td>{{ apt.scheduled_date|date:"d/m/Y" }}</td>
+                <td>{{ apt.technician.full_name }}</td>
+                <td><span class="badge bg-secondary">{{ apt.get_service_type_display }}</span></td>
+                <td>{{ apt.start_time|time:"H:i" }}–{{ apt.end_time|time:"H:i" }}</td>
+                <td>
+                  <span class="badge bg-{% if apt.status == 'completed' %}success{% elif apt.status == 'cancelled' %}secondary{% elif apt.status == 'in_progress' %}warning{% else %}primary{% endif %}">
+                    {{ apt.get_status_display }}
+                  </span>
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="6" class="text-muted text-center py-4">ยังไม่มีประวัติ</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

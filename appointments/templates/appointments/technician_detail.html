@@ -1,0 +1,235 @@
+{% extends "appointments/base.html" %}
+{% block title %}{{ technician.full_name }} – CMMS{% endblock %}
+{% block extra_head %}
+<style>
+  .technician-hero { background: linear-gradient(135deg, #17324d 0%, #245b70 100%); color: #fff; }
+  .technician-avatar { width: 76px; height: 76px; font-size: 2rem; border: 3px solid rgba(255,255,255,.75); }
+  .technician-hero .text-muted { color: rgba(255,255,255,.68) !important; }
+  .metric-strip { margin-top: -28px; position: relative; z-index: 1; }
+  .metric-value { font-size: 1.35rem; font-weight: 700; line-height: 1; }
+  .section-label { color: #64748b; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .compact-table td, .compact-table th { padding: .65rem .75rem; }
+  @media (max-width: 767.98px) {
+    .metric-strip { margin-top: 12px; }
+    .technician-hero .btn { width: 100%; }
+  }
+</style>
+{% endblock %}
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'appointments:technician_list' %}">ช่างเทคนิค</a></li>
+  <li class="breadcrumb-item active">{{ technician.full_name }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="technician-hero rounded-3 p-4 mb-3">
+  <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+    <div class="d-flex align-items-center gap-3">
+      <div class="technician-avatar rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+           style="background:{{ technician.color }}">
+        {{ technician.first_name|first }}
+      </div>
+      <div>
+        <div class="section-label text-white-50 mb-1">ช่างเทคนิค</div>
+        <h1 class="h4 mb-1">{{ technician.full_name }}</h1>
+        <div class="text-muted small">รหัสพนักงาน {{ technician.employee_id }}</div>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'appointments:technician_update' technician.pk %}" class="btn btn-light btn-sm">
+        <i class="bi bi-pencil me-1"></i>แก้ไขข้อมูล
+      </a>
+      <a href="{% url 'appointments:appointment_create' %}?technician={{ technician.pk }}" class="btn btn-info btn-sm">
+        <i class="bi bi-calendar-plus me-1"></i>สร้างนัดหมาย
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 metric-strip mb-4">
+  <div class="col-sm-4">
+    <div class="card h-100"><div class="card-body d-flex align-items-center gap-3">
+      <i class="bi bi-calendar-check text-primary fs-3"></i>
+      <div><div class="metric-value">{{ upcoming|length }}</div><div class="text-muted small">นัดหมายที่จะมาถึง</div></div>
+    </div></div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card h-100"><div class="card-body d-flex align-items-center gap-3">
+      <i class="bi bi-calendar-x text-danger fs-3"></i>
+      <div><div class="metric-value">{{ leaves|length }}</div><div class="text-muted small">รายการลา</div></div>
+    </div></div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card h-100"><div class="card-body d-flex align-items-center gap-3">
+      <i class="bi bi-moon-stars text-warning fs-3"></i>
+      <div><div class="metric-value">{{ overtime_days|length }}</div><div class="text-muted small">วันนอกเวลา</div></div>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-3">
+
+  <div class="col-lg-8">
+    <!-- Upcoming appointments -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-calendar-check me-2 text-primary"></i>นัดหมายที่จะมาถึง</span>
+        <a href="{% url 'appointments:appointment_list' %}?technician={{ technician.pk }}" class="btn btn-sm btn-outline-secondary">ดูทั้งหมด</a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover compact-table mb-0 small">
+            <thead class="table-light"><tr><th>วันที่</th><th>เวลา</th><th>เครื่องมือ</th><th>โรงพยาบาล</th><th>ประเภท</th><th>ช่วงเวลา</th></tr></thead>
+            <tbody>
+              {% for apt in upcoming %}
+              <tr onclick="location.href='{% url 'appointments:appointment_detail' apt.pk %}'" style="cursor:pointer">
+                <td class="text-nowrap">{{ apt.scheduled_date|date:"D d/m/Y" }}</td>
+                <td class="text-nowrap">{{ apt.start_time|time:"H:i" }}–{{ apt.end_time|time:"H:i" }}</td>
+                <td><div>{{ apt.equipment.name }}</div><div class="text-muted">S/N: {{ apt.equipment.serial_number }}</div></td>
+                <td>{{ apt.equipment.customer.name }}</td>
+                <td><span class="badge bg-secondary">{{ apt.service_type }}</span></td>
+                <td>
+                  {% if apt.time_type == 'overtime_wday' %}<span class="badge badge-overtime">นอกเวลา จ.-ศ.</span>
+                  {% elif apt.time_type == 'overtime_wknd' %}<span class="badge badge-weekend">เสาร์/อาทิตย์</span>
+                  {% elif apt.time_type == 'overtime' %}<span class="badge badge-overtime">นอกเวลา</span>
+                  {% else %}<span class="badge badge-office">ราชการ</span>{% endif %}
+                </td>
+              </tr>
+              {% empty %}<tr><td colspan="6" class="text-muted text-center py-4">ไม่มีนัดหมายที่จะมาถึง</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leave list -->
+    <div class="card">
+      <div class="card-header"><i class="bi bi-calendar-x me-2 text-danger"></i>การลา / ไม่อยู่ที่กำหนดไว้</div>
+      <div class="card-body p-0">
+        <table class="table table-hover compact-table mb-0 small">
+          <thead class="table-light"><tr><th>วันที่</th><th>ประเภท</th><th>เหตุผล</th></tr></thead>
+          <tbody>
+            {% for leave in leaves %}
+            <tr><td>{{ leave.leave_date|date:"D d/m/Y" }}</td><td><span class="badge bg-danger-subtle text-danger border border-danger-subtle">{{ leave.get_leave_type_display }}</span></td><td>{{ leave.reason|default:"–" }}</td></tr>
+            {% empty %}<tr><td colspan="3" class="text-muted text-center py-3">ไม่มีรายการลา</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <!-- Profile details -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-person-lines-fill me-2 text-primary"></i>ข้อมูลติดต่อ</div>
+      <div class="card-body small">
+        <div class="mb-2"><i class="bi bi-telephone text-muted me-2"></i>{{ technician.phone }}</div>
+        {% if technician.email %}<div><i class="bi bi-envelope text-muted me-2"></i>{{ technician.email }}</div>{% endif %}
+      </div>
+    </div>
+
+    <!-- Work Days -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-calendar-week me-2"></i>วันทำงาน</div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+          {% for wd in technician.work_days.all %}
+          <span class="badge bg-primary px-3 py-2">{{ wd.get_day_of_week_display }}</span>
+          {% empty %}
+          <span class="text-muted small">ยังไม่กำหนด</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Skills -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-lightning me-2 text-warning"></i>ทักษะ</div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+          {% for skill in technician.skills.all %}
+          <span class="badge bg-light text-dark border px-3 py-2">{{ skill.name }}</span>
+          {% empty %}
+          <span class="text-muted small">ยังไม่มีทักษะ</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Leave -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-calendar-x text-danger me-2"></i>บันทึกการลา</div>
+      <div class="card-body">
+        <form method="post" action="{% url 'appointments:technician_add_leave' technician.pk %}">
+          {% csrf_token %}
+          <div class="mb-2">
+            <label class="form-label small fw-500">วันที่ลา</label>
+            {{ leave_form.leave_date }}
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-500">ประเภท</label>
+            {{ leave_form.leave_type }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-500">เหตุผล</label>
+            {{ leave_form.reason }}
+          </div>
+          <input type="hidden" name="technician" value="{{ technician.pk }}">
+          <button type="submit" class="btn btn-sm btn-danger w-100">
+            <i class="bi bi-calendar-minus"></i> บันทึกการลา
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Add OT Day -->
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-moon-stars text-warning me-2"></i>ลงทะเบียนนอกเวลา</span>
+        <button class="btn btn-outline-warning btn-sm py-0" type="button"
+                data-bs-toggle="collapse" data-bs-target="#collapseAddOT">
+          <i class="bi bi-plus"></i>
+        </button>
+      </div>
+      <div class="collapse" id="collapseAddOT">
+        <div class="card-body border-bottom bg-light py-2">
+          <form method="post" action="{% url 'appointments:technician_add_overtime' technician.pk %}">
+            {% csrf_token %}
+            <div class="input-group input-group-sm">
+              {{ ot_form.date }}
+              <button type="submit" class="btn btn-warning">
+                <i class="bi bi-plus"></i> เพิ่ม
+              </button>
+            </div>
+            <div class="form-text">
+              จ.-ศ. = นอกเวลา 16:30–20:30 · เสาร์/อาทิตย์ = 08:30–16:30
+            </div>
+          </form>
+        </div>
+      </div>
+      {% if overtime_days %}
+      <div class="list-group list-group-flush small">
+        {% for ot in overtime_days %}
+        <div class="list-group-item d-flex align-items-center gap-2 py-2 px-3">
+          <span class="badge {% if ot.is_weekday %}badge-overtime{% else %}badge-weekend{% endif %}">
+            {% if ot.is_weekday %}OT{% else %}เสาร์/อาทิตย์{% endif %}
+          </span>
+          <span class="fw-500 flex-grow-1">{{ ot.date|date:"D d/m/Y" }}</span>
+          <span class="text-muted" style="font-size:.7rem">{{ ot.start_time_str }}–{{ ot.end_time_str }}</span>
+          <form method="post" action="{% url 'appointments:technician_remove_overtime' technician.pk ot.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-link btn-sm text-danger p-0"
+                    onclick="return confirm('ลบวันนอกเวลานี้?')">
+              <i class="bi bi-x-circle"></i>
+            </button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="card-body text-muted small text-center py-3">ยังไม่มีวันนอกเวลา</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

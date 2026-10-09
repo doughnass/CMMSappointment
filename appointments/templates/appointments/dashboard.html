@@ -1,0 +1,253 @@
+{% extends "appointments/base.html" %}
+{% block title %}หน้าหลัก – CMMS{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">หน้าหลัก</li>{% endblock %}
+
+{% block content %}
+
+<!-- ── Summary Cards ── -->
+<div class="row g-3 mb-4">
+
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card h-100" style="border-left-color:#0d6efd">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#0d6efd22;color:#0d6efd">
+          <i class="bi bi-heart-pulse"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold lh-1">{{ total_equipment }}</div>
+          <div class="text-muted small">เครื่องมือทั้งหมด</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card h-100" style="border-left-color:#198754">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#19875422;color:#198754">
+          <i class="bi bi-people"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold lh-1">{{ total_technicians }}</div>
+          <div class="text-muted small">ช่างเทคนิค</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card h-100" style="border-left-color:#dc3545">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#dc354522;color:#dc3545">
+          <i class="bi bi-exclamation-octagon"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold lh-1 text-danger">{{ overdue_maintenance }}</div>
+          <div class="text-muted small">PM เกินกำหนด</div>
+          {% if overdue_calibration > 0 %}
+          <div class="text-danger small">+{{ overdue_calibration }} สอบเทียบ</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card h-100" style="border-left-color:#fd7e14">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#fd7e1422;color:#fd7e14">
+          <i class="bi bi-clock-history"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold lh-1 text-warning">{{ due_soon }}</div>
+          <div class="text-muted small">ครบกำหนดใน 30 วัน</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Today's Appointments + Technician Status ── -->
+<div class="row g-3 mb-4">
+
+  <!-- Today -->
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-calendar-day text-primary me-2"></i>นัดหมายวันนี้
+          <span class="badge bg-primary ms-1">{{ today_appointments|length }}</span>
+        </span>
+        <a href="{% url 'appointments:appointment_list' %}?date_from={{ today }}&date_to={{ today }}" class="btn btn-sm btn-outline-secondary">ดูทั้งหมด</a>
+      </div>
+      <div class="card-body p-0">
+        {% if today_appointments %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>เวลา</th>
+                <th>ช่าง</th>
+                <th>เครื่องมือ</th>
+                <th>ประเภท</th>
+                <th>สถานะ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for apt in today_appointments %}
+              <tr onclick="location.href='{% url 'appointments:appointment_detail' apt.pk %}'" style="cursor:pointer">
+                <td class="text-nowrap fw-500">
+                  {{ apt.start_time|time:"H:i" }} – {{ apt.end_time|time:"H:i" }}
+                  {% if apt.time_type == 'overtime' %}
+                  <span class="badge badge-overtime ms-1">OT</span>
+                  {% endif %}
+                </td>
+                <td>{{ apt.technician.first_name }}</td>
+                <td>
+                  <div class="fw-500">{{ apt.equipment.name }}</div>
+                  <div class="text-muted small">{{ apt.equipment.customer.name }}</div>
+                </td>
+                <td><span class="badge bg-secondary">{{ apt.get_service_type_display }}</span></td>
+                <td>
+                  <span class="badge bg-{% if apt.status == 'completed' %}success{% elif apt.status == 'cancelled' %}secondary{% elif apt.status == 'in_progress' %}warning{% elif apt.status == 'confirmed' %}info{% else %}primary{% endif %}">
+                    {{ apt.get_status_display }}
+                  </span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-calendar-check fs-2 d-block mb-2"></i>
+          ไม่มีนัดหมายสำหรับวันนี้
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Technician availability -->
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-people text-success me-2"></i>สถานะช่างวันนี้</span>
+        <a href="{% url 'appointments:dispatch_board' %}" class="btn btn-sm btn-primary">
+          <i class="bi bi-kanban me-1"></i>กระดานจ่ายงาน
+        </a>
+      </div>
+      <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+          {% for ts in technician_stats %}
+          <li class="list-group-item px-3 py-2">
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <span class="rounded-circle flex-shrink-0" style="width:10px;height:10px;background:{{ ts.technician.color }}"></span>
+              <span class="fw-500 small flex-grow-1">{{ ts.technician.full_name }}</span>
+              {% if ts.available_today %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle">ปฏิบัติงาน</span>
+              {% else %}
+                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">ไม่อยู่วันนี้</span>
+              {% endif %}
+              {% if ts.week_count > 0 %}
+              <span class="badge bg-primary-subtle text-primary border border-primary-subtle">{{ ts.week_count }} นัด</span>
+              {% endif %}
+              <a href="{% url 'appointments:appointment_create' %}?technician={{ ts.technician.pk }}&date={{ today|date:'Y-m-d' }}"
+                 class="btn btn-outline-primary btn-sm py-0 px-2" title="จองช่างนี้วันนี้">
+                <i class="bi bi-plus"></i>
+              </a>
+            </div>
+          </li>
+          {% empty %}
+          <li class="list-group-item text-muted text-center py-4">ยังไม่มีช่างในระบบ</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Upcoming Appointments + Overdue Equipment ── -->
+<div class="row g-3">
+
+  <!-- Upcoming -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-calendar-week text-primary me-2"></i>นัดหมายที่จะมาถึง (7 วัน)</span>
+        <a href="{% url 'appointments:schedule' %}" class="btn btn-sm btn-outline-primary">ดูปฏิทิน</a>
+      </div>
+      <div class="card-body p-0">
+        {% if upcoming_appointments %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 small">
+            <thead class="table-light"><tr><th>วันที่</th><th>ช่าง</th><th>เครื่องมือ / ที่ตั้ง</th><th>ประเภท</th></tr></thead>
+            <tbody>
+              {% for apt in upcoming_appointments %}
+              <tr onclick="location.href='{% url 'appointments:appointment_detail' apt.pk %}'" style="cursor:pointer">
+                <td class="text-nowrap">
+                  {{ apt.scheduled_date|date:"d/m" }}<br>
+                  <span class="text-muted">{{ apt.start_time|time:"H:i" }}</span>
+                </td>
+                <td>{{ apt.technician.first_name }}</td>
+                <td>
+                  <div>{{ apt.equipment.name }}</div>
+                  <div class="text-muted">{{ apt.equipment.customer.name }}</div>
+                </td>
+                <td><span class="badge bg-secondary">{{ apt.service_type }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4 small">ไม่มีนัดหมายในอีก 7 วัน</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Overdue equipment -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-exclamation-triangle text-danger me-2"></i>เครื่องมือเกินกำหนด PM</span>
+        <a href="{% url 'appointments:equipment_list' %}?filter=overdue" class="btn btn-sm btn-outline-danger">ดูทั้งหมด</a>
+      </div>
+      <div class="card-body p-0">
+        {% if overdue_equipment %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 small">
+            <thead class="table-light"><tr><th>เครื่องมือ</th><th>โรงพยาบาล</th><th>PM ถัดไป</th><th></th></tr></thead>
+            <tbody>
+              {% for eq in overdue_equipment %}
+              <tr>
+                <td>
+                  <div class="fw-500">{{ eq.name }}</div>
+                  <div class="text-muted">S/N: {{ eq.serial_number }}</div>
+                </td>
+                <td>{{ eq.customer.name|truncatechars:20 }}</td>
+                <td>
+                  <span class="text-danger fw-600">
+                    {{ eq.next_maintenance_date|date:"d/m/Y"|default:"ไม่ระบุ" }}
+                  </span>
+                  {% if eq.days_until_maintenance is not None %}
+                  <div class="text-danger small">{{ eq.days_until_maintenance|add:0 }} วัน</div>
+                  {% endif %}
+                </td>
+                <td>
+                  <a href="{% url 'appointments:appointment_create' %}?equipment_id={{ eq.pk }}"
+                     class="btn btn-xs btn-danger btn-sm py-0 px-2">นัด</a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4 small">ไม่มีเครื่องมือเกินกำหนด</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

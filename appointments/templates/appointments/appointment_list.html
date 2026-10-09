@@ -1,0 +1,191 @@
+{% extends "appointments/base.html" %}
+{% block title %}รายการนัดหมาย – CMMS{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">รายการนัดหมาย</li>{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <h5 class="mb-0"><i class="bi bi-list-check me-2 text-primary"></i>รายการนัดหมายทั้งหมด</h5>
+  <a href="{% url 'appointments:appointment_create' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg"></i> สร้างนัดหมาย
+  </a>
+</div>
+
+<!-- Filter Bar -->
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <!-- Row 1 -->
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-500 mb-1">ตั้งแต่วันที่</label>
+        <input type="date" name="date_from" value="{{ request.GET.date_from }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-500 mb-1">ถึงวันที่</label>
+        <input type="date" name="date_to" value="{{ request.GET.date_to }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-500 mb-1">ลูกค้า / โรงพยาบาล</label>
+        <select name="customer" class="form-select form-select-sm">
+          <option value="">– ทั้งหมด –</option>
+          {% for c in customers %}
+          <option value="{{ c.pk }}" {% if request.GET.customer == c.pk|stringformat:"i" %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-500 mb-1">ช่าง</label>
+        <select name="technician" class="form-select form-select-sm">
+          <option value="">– ทุกคน –</option>
+          {% for t in technicians %}
+          <option value="{{ t.pk }}" {% if request.GET.technician == t.pk|stringformat:"i" %}selected{% endif %}>{{ t.full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-500 mb-1">ประเภทงาน</label>
+        <select name="service_type" class="form-select form-select-sm">
+          <option value="">– ทั้งหมด –</option>
+          {% for val, label in service_type_choices %}
+          <option value="{{ val }}" {% if request.GET.service_type == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-500 mb-1">สถานะ</label>
+        <select name="status" class="form-select form-select-sm">
+          <option value="">– ทุกสถานะ –</option>
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-8 col-md-2">
+        <label class="form-label small fw-500 mb-1">ค้นหา</label>
+        <div class="input-group input-group-sm">
+          <input type="text" name="search" value="{{ request.GET.search }}" class="form-control" placeholder="เลขที่ / ชื่อ…">
+          <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+        </div>
+      </div>
+      <div class="col-4 col-md-2 d-flex align-items-end gap-1">
+        <a href="{% url 'appointments:appointment_list' %}" class="btn btn-outline-secondary btn-sm w-100">ล้าง</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Count + Table -->
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between py-2">
+    <span class="small text-muted">พบ <strong>{{ total_count }}</strong> รายการ
+      {% if page_obj.paginator.num_pages > 1 %}
+      · หน้า {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}
+      {% endif %}
+    </span>
+    <a href="{% url 'appointments:reports' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-bar-chart me-1"></i>รายงาน
+    </a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 small">
+        <thead class="table-light">
+          <tr>
+            <th>เลขที่</th>
+            <th>วันที่ / เวลา</th>
+            <th>ช่าง</th>
+            <th>เครื่องมือ</th>
+            <th>โรงพยาบาล</th>
+            <th>ประเภท</th>
+            <th>ช่วงเวลา</th>
+            <th>สถานะ</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for apt in appointments %}
+          <tr>
+            <td class="fw-500">
+              <a href="{% url 'appointments:appointment_detail' apt.pk %}" class="text-decoration-none">
+                {{ apt.appointment_no }}
+              </a>
+            </td>
+            <td class="text-nowrap">
+              {{ apt.scheduled_date|date:"d/m/Y" }}<br>
+              <span class="text-muted">{{ apt.start_time|time:"H:i" }}–{{ apt.end_time|time:"H:i" }}</span>
+            </td>
+            <td>
+              <span class="rounded-circle d-inline-block me-1"
+                    style="width:8px;height:8px;background:{{ apt.technician.color }}"></span>
+              {{ apt.technician.first_name }}
+            </td>
+            <td>
+              <div>{{ apt.equipment.name }}</div>
+              <div class="text-muted">{{ apt.equipment.serial_number }}</div>
+            </td>
+            <td>{{ apt.equipment.customer.name|truncatechars:25 }}</td>
+            <td>
+              <span class="badge bg-{% if apt.service_type == 'PM' %}success{% elif apt.service_type == 'CAL' %}info{% elif apt.service_type == 'PM_CAL' %}primary{% else %}warning{% endif %}">
+                {{ apt.service_type }}
+              </span>
+            </td>
+            <td>
+              {% if apt.time_type == 'overtime_wday' %}
+              <span class="badge badge-overtime">นอกเวลา จ.-ศ.</span>
+              {% elif apt.time_type == 'overtime_wknd' %}
+              <span class="badge badge-weekend">เสาร์/อาทิตย์</span>
+              {% elif apt.time_type == 'overtime' %}
+              <span class="badge badge-overtime">นอกเวลา</span>
+              {% else %}
+              <span class="badge badge-office">ราชการ</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge bg-{% if apt.status == 'completed' %}success{% elif apt.status == 'cancelled' %}secondary{% elif apt.status == 'in_progress' %}warning{% elif apt.status == 'confirmed' %}info{% else %}primary{% endif %}">
+                {{ apt.get_status_display }}
+              </span>
+            </td>
+            <td class="text-nowrap">
+              <a href="{% url 'appointments:appointment_update' apt.pk %}" class="btn btn-xs btn-outline-secondary btn-sm py-0 px-2">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="{% url 'appointments:appointment_delete' apt.pk %}" class="d-inline"
+                    onsubmit="return confirm('ยืนยันลบนัดหมาย {{ apt.appointment_no }}?')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="ลบนัดหมาย">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" class="text-center text-muted py-5">
+              <i class="bi bi-inbox fs-2 d-block mb-2"></i>ไม่พบนัดหมาย
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div class="card-footer py-2">
+    <nav>
+      <ul class="pagination pagination-sm justify-content-center mb-0">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="{% querystring page=1 %}">«</a></li>
+        <li class="page-item"><a class="page-link" href="{% querystring page=page_obj.previous_page_number %}">‹</a></li>
+        {% endif %}
+        <li class="page-item disabled">
+          <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        </li>
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="{% querystring page=page_obj.next_page_number %}">›</a></li>
+        <li class="page-item"><a class="page-link" href="{% querystring page=page_obj.paginator.num_pages %}">»</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

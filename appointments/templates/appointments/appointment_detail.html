@@ -1,0 +1,352 @@
+{% extends "appointments/base.html" %}
+{% load appointments_extras %}
+{% block title %}{{ appointment.appointment_no }} – CMMS{% endblock %}
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'appointments:appointment_list' %}">นัดหมาย</a></li>
+  <li class="breadcrumb-item active">{{ appointment.appointment_no }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 justify-content-center">
+  <div class="col-lg-8">
+    <div class="card">
+      <!-- Colored header bar -->
+      <div class="card-header d-flex align-items-center justify-content-between"
+           style="border-left:4px solid {{ appointment.technician.color }}">
+        <div>
+          <span class="fw-bold fs-5">{{ appointment.appointment_no }}</span>
+          <span class="badge ms-2
+            bg-{% if appointment.status == 'completed' %}success{% elif appointment.status == 'cancelled' %}secondary{% elif appointment.status == 'in_progress' %}warning{% elif appointment.status == 'confirmed' %}info{% else %}primary{% endif %}">
+            {{ appointment.get_status_display }}
+          </span>
+          {% if appointment.time_type == 'overtime' %}
+          <span class="badge badge-overtime ms-1">นอกเวลาราชการ</span>
+          {% else %}
+          <span class="badge badge-office ms-1">ในเวลาราชการ</span>
+          {% endif %}
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{% url 'appointments:appointment_update' appointment.pk %}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-pencil"></i> แก้ไข
+          </a>
+          <form method="post" action="{% url 'appointments:appointment_delete' appointment.pk %}"
+                onsubmit="return confirm('ยืนยันลบนัดหมาย {{ appointment.appointment_no }}?')">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="row g-4">
+
+          <!-- Equipment Info -->
+          <div class="col-md-6">
+            <h6 class="text-muted border-bottom pb-2"><i class="bi bi-heart-pulse me-2 text-primary"></i>เครื่องมือแพทย์</h6>
+            <dl class="row small mb-0">
+              <dt class="col-5 text-muted">ชื่อเครื่องมือ</dt>
+              <dd class="col-7 fw-500">
+                <a href="{% url 'appointments:equipment_detail' appointment.equipment.pk %}">
+                  {{ appointment.equipment.name }}
+                </a>
+              </dd>
+              <dt class="col-5 text-muted">Serial No.</dt>
+              <dd class="col-7">{{ appointment.equipment.serial_number }}</dd>
+              {% if appointment.equipment.category %}
+              <dt class="col-5 text-muted">ประเภท</dt>
+              <dd class="col-7">{{ appointment.equipment.category }}</dd>
+              {% endif %}
+              <dt class="col-5 text-muted">โรงพยาบาล</dt>
+              <dd class="col-7">{{ appointment.equipment.customer.name }}</dd>
+              <dt class="col-5 text-muted">แผนก</dt>
+              <dd class="col-7">{{ appointment.equipment.department|default:"–" }}</dd>
+            </dl>
+          </div>
+
+          <!-- Technician Info -->
+          <div class="col-md-6">
+            <h6 class="text-muted border-bottom pb-2">
+              <span class="rounded-circle d-inline-block me-2"
+                    style="width:10px;height:10px;background:{{ appointment.technician.color }}"></span>
+              ช่างเทคนิค
+            </h6>
+            <dl class="row small mb-0">
+              <dt class="col-5 text-muted">ชื่อ-นามสกุล</dt>
+              <dd class="col-7 fw-500">
+                <a href="{% url 'appointments:technician_detail' appointment.technician.pk %}">
+                  {{ appointment.technician.full_name }}
+                </a>
+              </dd>
+              <dt class="col-5 text-muted">รหัสพนักงาน</dt>
+              <dd class="col-7">{{ appointment.technician.employee_id }}</dd>
+              <dt class="col-5 text-muted">โทรศัพท์</dt>
+              <dd class="col-7">{{ appointment.technician.phone }}</dd>
+            </dl>
+          </div>
+
+          <!-- Schedule Info -->
+          <div class="col-12">
+            <h6 class="text-muted border-bottom pb-2"><i class="bi bi-calendar-event me-2"></i>กำหนดการ</h6>
+            <div class="row g-3">
+              <div class="col-auto">
+                <div class="border rounded p-3 text-center" style="min-width:120px">
+                  <div class="text-muted small">วันที่</div>
+                  <div class="fs-5 fw-bold">{{ appointment.scheduled_date|date:"d" }}</div>
+                  <div class="small">{{ appointment.scheduled_date|date:"F Y" }}</div>
+                </div>
+              </div>
+              <div class="col-auto">
+                <div class="border rounded p-3 text-center" style="min-width:140px">
+                  <div class="text-muted small">เวลา</div>
+                  <div class="fs-5 fw-bold">{{ appointment.start_time|time:"H:i" }}</div>
+                  <div class="small text-muted">ถึง {{ appointment.end_time|time:"H:i" }}</div>
+                </div>
+              </div>
+              <div class="col-auto">
+                <div class="border rounded p-3 text-center" style="min-width:120px">
+                  <div class="text-muted small">ระยะเวลา</div>
+                  <div class="fs-5 fw-bold">{{ appointment.duration_minutes }}</div>
+                  <div class="small text-muted">นาที</div>
+                </div>
+              </div>
+              <div class="col-auto">
+                <div class="border rounded p-3 text-center" style="min-width:140px">
+                  <div class="text-muted small">ประเภทงาน</div>
+                  <span class="badge bg-secondary fs-6">{{ appointment.get_service_type_display }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notes + Coordinator -->
+          <div class="col-md-6">
+            <h6 class="text-muted border-bottom pb-2"><i class="bi bi-person-check me-2"></i>ผู้ประสานงาน</h6>
+            <p class="fw-500 mb-0">{{ appointment.coordinator_name }}</p>
+          </div>
+          {% if appointment.notes %}
+          <div class="col-md-6">
+            <h6 class="text-muted border-bottom pb-2"><i class="bi bi-chat-text me-2"></i>หมายเหตุ</h6>
+            <p class="mb-0">{{ appointment.notes }}</p>
+          </div>
+          {% endif %}
+
+        </div><!-- /row -->
+      </div><!-- /card-body -->
+
+      <div class="card-footer text-muted small">
+        สร้างเมื่อ {{ appointment.created_at|date:"d/m/Y H:i" }}
+        {% if appointment.updated_at != appointment.created_at %}
+        · แก้ไขล่าสุด {{ appointment.updated_at|date:"d/m/Y H:i" }}
+        {% endif %}
+      </div>
+    </div>
+
+    {% if appointment.status != 'cancelled' %}
+    <!-- ── Workflow Panel ── -->
+    <div class="card mt-3">
+      <div class="card-header fw-600 d-flex align-items-center gap-2">
+        <i class="bi bi-arrow-repeat text-primary"></i>วงจรการให้บริการ
+        {% if appointment.status == 'completed' %}
+        <span class="badge bg-success ms-auto">เสร็จสิ้น</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+
+        <!-- Step progress bar -->
+        {% with s=appointment.status %}
+        <div class="d-flex align-items-center mb-4">
+          {% for step, label, icon in steps %}
+          <div class="text-center flex-fill">
+            <div class="rounded-circle d-inline-flex align-items-center justify-content-center
+              {% if step == s %}bg-primary text-white
+              {% elif step in completed_steps %}bg-success text-white
+              {% else %}bg-light text-muted border{% endif %}"
+              style="width:38px;height:38px;font-size:.9rem">
+              <i class="bi bi-{{ icon }}"></i>
+            </div>
+            <div class="small mt-1 {% if step == s %}fw-bold text-primary{% elif step in completed_steps %}text-success{% else %}text-muted{% endif %}">
+              {{ label }}
+            </div>
+          </div>
+          {% if not forloop.last %}
+          <div class="flex-fill" style="height:2px;background:{% if step in completed_steps %}#198754{% else %}#dee2e6{% endif %};margin-bottom:22px"></div>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% endwith %}
+
+        <div class="row g-3">
+
+          <!-- Step 1: รับเครื่อง -->
+          <div class="col-md-3">
+            <div class="card h-100 {% if appointment.equipment_received %}border-success{% endif %}">
+              <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <i class="bi bi-box-arrow-in-down {% if appointment.equipment_received %}text-success{% else %}text-muted{% endif %} fs-5"></i>
+                  <span class="fw-500 small">① รับเครื่อง</span>
+                </div>
+                {% if appointment.equipment_received %}
+                <div class="text-success small mb-2">
+                  <i class="bi bi-check-circle-fill me-1"></i>รับแล้ว
+                  {% if appointment.equipment_received_at %}
+                  <div class="text-muted">{{ appointment.equipment_received_at|date:"d/m/Y H:i" }}</div>
+                  {% endif %}
+                </div>
+                {% endif %}
+                {% if appointment.status != 'completed' %}
+                <form method="post" action="{% url 'appointments:appointment_receive' appointment.pk %}">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm w-100 {% if appointment.equipment_received %}btn-outline-success{% else %}btn-outline-secondary{% endif %}">
+                    {% if appointment.equipment_received %}<i class="bi bi-x me-1"></i>ยกเลิกรับ{% else %}<i class="bi bi-check me-1"></i>รับเครื่องแล้ว{% endif %}
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: จ่ายงาน -->
+          <div class="col-md-3">
+            <div class="card h-100 {% if appointment.assigned_to %}border-primary{% endif %}">
+              <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <i class="bi bi-person-check {% if appointment.assigned_to %}text-primary{% else %}text-muted{% endif %} fs-5"></i>
+                  <span class="fw-500 small">② จ่ายงาน</span>
+                </div>
+                {% if appointment.assigned_to %}
+                <div class="small mb-2">
+                  <span class="badge bg-primary">{{ appointment.assigned_to.full_name }}</span>
+                </div>
+                {% endif %}
+                {% if appointment.status != 'completed' %}
+                <form method="post" action="{% url 'appointments:appointment_assign' appointment.pk %}">
+                  {% csrf_token %}
+                  <select name="assigned_to" class="form-select form-select-sm mb-2">
+                    <option value="">— เลือกช่าง —</option>
+                    {% for tech in technicians %}
+                    <option value="{{ tech.pk }}" {% if appointment.assigned_to_id == tech.pk %}selected{% endif %}>
+                      {{ tech.full_name }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="btn btn-sm btn-outline-primary w-100">
+                    <i class="bi bi-check me-1"></i>มอบหมาย
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3: ดำเนินการ -->
+          <div class="col-md-3">
+            <div class="card h-100 {% if appointment.status == 'in_progress' %}border-warning{% elif appointment.status == 'completed' %}border-success{% endif %}">
+              <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <i class="bi bi-tools {% if appointment.status == 'in_progress' %}text-warning{% elif appointment.status == 'completed' %}text-success{% else %}text-muted{% endif %} fs-5"></i>
+                  <span class="fw-500 small">③ ดำเนินการ</span>
+                </div>
+                <div class="small">
+                  {% if appointment.status == 'in_progress' %}
+                  <span class="badge bg-warning text-dark">กำลังดำเนินการ</span>
+                  {% elif appointment.status == 'completed' %}
+                  <span class="badge bg-success">เสร็จสิ้น</span>
+                  {% elif appointment.equipment_received and appointment.assigned_to %}
+                  <span class="badge bg-secondary">รอเริ่มงาน</span>
+                  {% else %}
+                  <span class="text-muted">รอรับเครื่อง/จ่ายงาน</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 4: เสร็จสิ้น -->
+          <div class="col-md-3">
+            <div class="card h-100 {% if appointment.status == 'completed' %}border-success bg-success bg-opacity-10{% endif %}">
+              <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <i class="bi bi-patch-check {% if appointment.status == 'completed' %}text-success{% else %}text-muted{% endif %} fs-5"></i>
+                  <span class="fw-500 small">④ เสร็จสิ้น</span>
+                </div>
+                {% if appointment.status == 'completed' %}
+                <div class="small text-success mb-1">
+                  <i class="bi bi-check-circle-fill me-1"></i>{{ appointment.actual_completion_date|date:"d/m/Y" }}
+                </div>
+                {% if appointment.completion_notes %}
+                <div class="small text-muted">{{ appointment.completion_notes }}</div>
+                {% endif %}
+                {% else %}
+                <form method="post" action="{% url 'appointments:appointment_complete_action' appointment.pk %}">
+                  {% csrf_token %}
+                  <div class="mb-2">
+                    <label class="form-label small mb-1">วันที่เสร็จ <span class="text-danger">*</span></label>
+                    <input type="date" name="actual_completion_date" class="form-control form-control-sm"
+                           value="{{ appointment.scheduled_date|date:'Y-m-d' }}" required>
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label small mb-1">บันทึกผลงาน</label>
+                    <textarea name="completion_notes" class="form-control form-control-sm" rows="2"
+                              placeholder="ผลการดำเนินงาน, ปัญหาที่พบ…"></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-sm btn-success w-100">
+                    <i class="bi bi-patch-check me-1"></i>บันทึกเสร็จสิ้น
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /row steps -->
+
+        <!-- Next due dates (shown after completion) -->
+        {% if appointment.status == 'completed' %}
+        <div class="mt-3 p-3 bg-light rounded border">
+          <div class="fw-600 mb-2"><i class="bi bi-calendar-check text-primary me-2"></i>กำหนดครบรอบถัดไป (อัพเดทในทะเบียนแล้ว)</div>
+          <div class="row g-3">
+            {% with eq=appointment.equipment %}
+            {% if eq.next_maintenance_date %}
+            <div class="col-auto">
+              <div class="border rounded p-2 text-center" style="min-width:130px">
+                <div class="text-muted small">PM ถัดไป</div>
+                <div class="fw-bold text-primary">{{ eq.next_maintenance_date|date:"d/m/Y" }}</div>
+                <div class="small text-muted">
+                  {% with days=eq.days_until_maintenance %}
+                  {% if days < 0 %}เกินกำหนด {{ days|abs_value }} วัน
+                  {% elif days == 0 %}วันนี้!
+                  {% else %}อีก {{ days }} วัน{% endif %}
+                  {% endwith %}
+                </div>
+              </div>
+            </div>
+            {% endif %}
+            {% if eq.next_calibration_date %}
+            <div class="col-auto">
+              <div class="border rounded p-2 text-center" style="min-width:130px">
+                <div class="text-muted small">Calibration ถัดไป</div>
+                <div class="fw-bold text-info">{{ eq.next_calibration_date|date:"d/m/Y" }}</div>
+                <div class="small text-muted">
+                  {% with days=eq.days_until_calibration %}
+                  {% if days < 0 %}เกินกำหนด {{ days|abs_value }} วัน
+                  {% elif days == 0 %}วันนี้!
+                  {% else %}อีก {{ days }} วัน{% endif %}
+                  {% endwith %}
+                </div>
+              </div>
+            </div>
+            {% endif %}
+            {% endwith %}
+          </div>
+        </div>
+        {% endif %}
+
+      </div><!-- /card-body -->
+    </div><!-- /workflow card -->
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

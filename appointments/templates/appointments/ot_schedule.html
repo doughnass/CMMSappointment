@@ -1,0 +1,147 @@
+{% extends "appointments/base.html" %}
+{% block title %}ตารางนอกเวลา – CMMS{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">ตารางนอกเวลา</li>{% endblock %}
+
+{% block extra_head %}
+<style>
+  .cal-cell {
+    min-height: 80px; vertical-align: top;
+    border: 1px solid #e9ecef; padding: 4px 6px;
+    cursor: pointer; transition: background .1s;
+  }
+  .cal-cell:hover { background: #f8fbff; }
+  .cal-cell.today { background: #e8f4fd !important; }
+  .cal-cell.out-month { background: #fafafa; color: #ccc; }
+  .cal-cell.weekend-col { background: #fdf6ee; }
+  .cal-cell.has-ot { border-top: 3px solid #fd7e14; }
+  .cal-day-num { font-size: .8rem; font-weight: 600; margin-bottom: 3px; }
+  .cal-day-num.today-num {
+    background: #0d6efd; color: #fff;
+    border-radius: 50%; width: 22px; height: 22px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .ot-badge {
+    display: inline-block; font-size: .6rem;
+    padding: 1px 5px; border-radius: 3px; margin: 1px 1px 0 0;
+    white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .cal-table th {
+    text-align: center; padding: 6px 4px;
+    background: #f0f4f8; font-size: .8rem; font-weight: 600;
+    border: 1px solid #e9ecef;
+  }
+  .cal-table th.weekend-col { background: #fef3e2; color: #e96c00; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Header ── -->
+<div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+  <h5 class="mb-0"><i class="bi bi-moon-stars me-2 text-warning"></i>ตารางนอกเวลาช่าง</h5>
+  <div class="d-flex align-items-center gap-2 ms-auto">
+    <a href="?year={{ prev_month.year }}&month={{ prev_month.month }}"
+       class="btn btn-outline-secondary btn-sm"><i class="bi bi-chevron-left"></i></a>
+    <span class="fw-600 px-2">{{ month_name }}</span>
+    <a href="?year={{ next_month.year }}&month={{ next_month.month }}"
+       class="btn btn-outline-secondary btn-sm"><i class="bi bi-chevron-right"></i></a>
+    <a href="?year={{ today.year }}&month={{ today.month }}"
+       class="btn btn-outline-primary btn-sm">เดือนนี้</a>
+    <a href="{% url 'appointments:dispatch_board' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-kanban me-1"></i>กระดานจ่ายงาน
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+
+  <!-- ── Calendar ── -->
+  <div class="col-lg-9">
+    <div class="card">
+      <div class="card-body p-2">
+        <table class="cal-table">
+          <thead>
+            <tr>
+              {% for label in weekday_labels %}
+              <th class="{% if forloop.counter0 >= 5 %}weekend-col{% endif %}">{{ label }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for week in grid %}
+            <tr>
+              {% for cell in week %}
+              <td class="cal-cell
+                {% if not cell.in_month %}out-month{% elif forloop.counter0 >= 5 %}weekend-col{% endif %}
+                {% if cell.is_today %}today{% endif %}
+                {% if cell.ot_items %}has-ot{% endif %}"
+                onclick="{% if cell.ot_items or cell.in_month %}location.href='{% url 'appointments:dispatch_board' %}?date={{ cell.date|date:'Y-m-d' }}'{% endif %}">
+                <div class="cal-day-num{% if cell.is_today %} {% endif %}">
+                  {% if cell.is_today %}
+                  <span class="today-num">{{ cell.date.day }}</span>
+                  {% else %}
+                  {{ cell.date.day }}
+                  {% endif %}
+                </div>
+                {% for ot in cell.ot_items %}
+                <div class="ot-badge {% if ot.is_weekday %}badge-overtime{% else %}badge-weekend{% endif %}"
+                     style="border-left: 3px solid {{ ot.technician.color }}"
+                     title="{{ ot.technician.full_name }} {{ ot.start_time_str }}–{{ ot.end_time_str }}">
+                  {{ ot.technician.first_name }}
+                </div>
+                {% endfor %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend + Summary -->
+  <div class="col-lg-3">
+
+    <!-- All technicians: quick link to add OT -->
+    <div class="card mb-3">
+      <div class="card-header fw-600 py-2 small">
+        <i class="bi bi-person-plus me-2 text-warning"></i>ลงทะเบียนนอกเวลา
+      </div>
+      <div class="list-group list-group-flush">
+        {% for tech in all_technicians %}
+        <a href="{% url 'appointments:technician_detail' tech.pk %}#ot"
+           class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 px-3 small">
+          <div class="d-flex align-items-center gap-2">
+            <span class="rounded-circle flex-shrink-0"
+                  style="width:10px;height:10px;background:{{ tech.color }}"></span>
+            {{ tech.full_name }}
+          </div>
+          <span class="badge badge-overtime" style="font-size:.6rem">
+            {% for ot in grid %}{% for cell in ot %}{% for item in cell.ot_items %}{% if item.technician_id == tech.pk %}+{% endif %}{% endfor %}{% endfor %}{% endfor %}
+            เพิ่ม OT <i class="bi bi-arrow-right"></i>
+          </span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Type legend -->
+    <div class="card">
+      <div class="card-body py-2 px-3 small">
+        <div class="fw-500 mb-2 text-muted">ประเภทนอกเวลา</div>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="ot-badge badge-overtime px-2">OT</span>
+          <span>นอกเวลา จ.–ศ.<br><span class="text-muted">16:30–20:30</span></span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="ot-badge badge-weekend px-2">OT</span>
+          <span>เสาร์/อาทิตย์<br><span class="text-muted">08:30–16:30</span></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,152 @@
+{% extends "appointments/base.html" %}
+{% block title %}ลูกค้า / โรงพยาบาล – CMMS{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">ลูกค้า / โรงพยาบาล</li>{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <h5 class="mb-0"><i class="bi bi-hospital me-2 text-info"></i>ลูกค้า / โรงพยาบาล</h5>
+  <div class="d-flex gap-2 flex-wrap">
+    <input type="search" id="customerSearch" class="form-control form-control-sm" style="width:220px"
+           placeholder="ค้นหารหัส / ชื่อ…">
+    <button type="button" id="btnExpandAll" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrows-expand me-1"></i>ขยายทั้งหมด
+    </button>
+    <button type="button" id="btnCollapseAll" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrows-collapse me-1"></i>ย่อทั้งหมด
+    </button>
+    <a href="{% url 'appointments:customer_create' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg"></i> เพิ่มลูกค้า
+    </a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0" id="customerTree">
+      <thead class="table-light">
+        <tr>
+          <th>รหัส</th><th>ชื่อ</th><th>ผู้ติดต่อ</th><th>โทรศัพท์</th>
+          <th>จำนวนเครื่องมือ</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% with c=row.customer level=row.level indent=row.indent %}
+        <tr{% if level == 0 %} class="table-secondary"{% endif %}
+            data-customer-id="{{ c.pk }}"
+            data-search-text="{{ c.code|lower }} {{ c.name|lower }}"
+            {% if row.parent_id %}data-parent-id="{{ row.parent_id }}"{% endif %}>
+          <td style="padding-left: {{ indent|add:12 }}px">
+            {% if row.has_children %}
+              <button type="button" class="btn btn-link btn-sm p-0 me-1 tree-toggle"
+                      data-target="{{ c.pk }}" title="ขยาย/ย่อ">
+                <i class="bi bi-chevron-down text-secondary"></i>
+              </button>
+            {% else %}
+              <span style="display:inline-block;width:1.4rem"></span>
+            {% endif %}
+            {% if level > 0 %}<span class="text-muted me-1">↳</span>{% endif %}
+            <span{% if level == 0 %} class="fw-bold"{% endif %}>{{ c.code }}</span>
+          </td>
+          <td>
+            <a href="{% url 'appointments:customer_detail' c.pk %}"
+               class="text-decoration-none{% if level == 0 %} fw-bold{% endif %}">
+              {{ c.name }}
+            </a>
+          </td>
+          <td>{{ c.contact_person|default:"–" }}</td>
+          <td>{{ c.phone|default:"–" }}</td>
+          <td>
+            <a href="{% url 'appointments:equipment_list' %}?customer={{ c.pk }}"
+               class="badge {% if level == 0 %}bg-primary{% else %}bg-secondary{% endif %} text-decoration-none">
+              {{ c.equipment.count }} เครื่อง
+            </a>
+          </td>
+          <td class="text-end">
+            <a href="{% url 'appointments:customer_update' c.pk %}" class="btn btn-outline-secondary btn-sm py-0 me-1">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'appointments:customer_delete' c.pk %}" class="btn btn-outline-danger btn-sm py-0">
+              <i class="bi bi-trash"></i>
+            </a>
+          </td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-4">ยังไม่มีลูกค้า</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function () {
+  function collapseNode(btn) {
+    hideAllDescendants(btn.dataset.target);
+    btn.querySelector('i').className = 'bi bi-chevron-right text-secondary';
+    btn.dataset.open = 'false';
+  }
+  function expandNode(btn) {
+    document.querySelectorAll(`tr[data-parent-id="${btn.dataset.target}"]`)
+      .forEach(r => r.style.display = '');
+    btn.querySelector('i').className = 'bi bi-chevron-down text-secondary';
+    btn.dataset.open = 'true';
+  }
+  function hideAllDescendants(parentId) {
+    document.querySelectorAll(`tr[data-parent-id="${parentId}"]`).forEach(row => {
+      row.style.display = 'none';
+      hideAllDescendants(row.dataset.customerId);
+    });
+  }
+
+  document.querySelectorAll('.tree-toggle').forEach(btn => {
+    btn.dataset.open = 'true';
+    btn.addEventListener('click', function () {
+      (this.dataset.open === 'true' ? collapseNode : expandNode)(this);
+    });
+  });
+
+  document.getElementById('btnCollapseAll').addEventListener('click', () =>
+    document.querySelectorAll('.tree-toggle').forEach(collapseNode));
+  document.getElementById('btnExpandAll').addEventListener('click', () =>
+    document.querySelectorAll('.tree-toggle').forEach(expandNode));
+
+  /* ── Search ── */
+  const searchInput = document.getElementById('customerSearch');
+  searchInput.addEventListener('input', function () {
+    const q = this.value.trim().toLowerCase();
+    const rows = document.querySelectorAll('#customerTree tbody tr');
+    if (!q) {
+      // restore tree state
+      rows.forEach(r => {
+        const pid = r.dataset.parentId;
+        if (pid) {
+          const btn = document.querySelector(`.tree-toggle[data-target="${pid}"]`);
+          r.style.display = btn && btn.dataset.open === 'false' ? 'none' : '';
+        } else {
+          r.style.display = '';
+        }
+      });
+      return;
+    }
+    // Collect matching customer ids
+    const matchIds = new Set();
+    rows.forEach(r => {
+      if (r.dataset.searchText && r.dataset.searchText.includes(q))
+        matchIds.add(r.dataset.customerId);
+    });
+    // Also show ancestors of matches
+    const ancestorIds = new Set();
+    rows.forEach(r => {
+      if (matchIds.has(r.dataset.customerId) && r.dataset.parentId)
+        ancestorIds.add(r.dataset.parentId);
+    });
+    rows.forEach(r => {
+      const id = r.dataset.customerId;
+      r.style.display = (matchIds.has(id) || ancestorIds.has(id)) ? '' : 'none';
+    });
+  });
+})();
+</script>
+{% endblock %}

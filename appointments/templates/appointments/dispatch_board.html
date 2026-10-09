@@ -1,0 +1,369 @@
+{% extends "appointments/base.html" %}
+{% block title %}กระดานจ่ายงาน – CMMS{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">กระดานจ่ายงาน</li>{% endblock %}
+
+{% block extra_head %}
+<style>
+  .dispatch-row { transition: box-shadow .15s; }
+  .dispatch-row:hover { box-shadow: 0 2px 12px rgba(0,0,0,.10); }
+  .tech-col { width: 200px; flex-shrink: 0; }
+  .timeline-wrap {
+    position: relative; height: 44px;
+    background: #f0f4f8; border-radius: 6px; overflow: hidden;
+    flex: 1;
+  }
+  .timeline-wrap.unavailable {
+    background: repeating-linear-gradient(
+      45deg, transparent, transparent 6px,
+      rgba(0,0,0,.04) 6px, rgba(0,0,0,.04) 12px
+    );
+  }
+  .apt-block {
+    position: absolute; top: 4px; bottom: 4px;
+    border-radius: 4px; border-left: 3px solid;
+    display: flex; align-items: center;
+    padding: 0 5px; overflow: hidden;
+    cursor: pointer; transition: opacity .15s;
+  }
+  .apt-block:hover { opacity: .85; }
+  .apt-block span { font-size: .68rem; white-space: nowrap; overflow: hidden; }
+  .hour-marker {
+    position: absolute; top: 0; bottom: 0;
+    width: 1px; background: rgba(0,0,0,.08);
+  }
+  .hour-label {
+    position: absolute; top: -18px;
+    font-size: .6rem; color: #adb5bd;
+    transform: translateX(-50%);
+  }
+  .capacity-bar { height: 6px; border-radius: 3px; background: #e9ecef; overflow: hidden; }
+  .capacity-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Date navigation ── -->
+<div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+  <h5 class="mb-0"><i class="bi bi-kanban me-2 text-primary"></i>กระดานจ่ายงาน</h5>
+  <div class="d-flex align-items-center gap-2 ms-auto">
+    <a href="?date={{ prev_date|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <input type="date" class="form-control form-control-sm" style="width:160px"
+           value="{{ selected_date|date:'Y-m-d' }}"
+           onchange="location.href='?date='+this.value">
+    <a href="?date={{ next_date|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+    <a href="?date={% now 'Y-m-d' %}" class="btn btn-outline-primary btn-sm">วันนี้</a>
+    <a href="{% url 'appointments:appointment_create' %}?date={{ selected_date|date:'Y-m-d' }}"
+       class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>สร้างนัด
+    </a>
+  </div>
+</div>
+
+<!-- ── Layout: dispatch (left) + OT schedule sidebar (right) ── -->
+<div class="row g-3">
+<div class="col-lg-9">
+
+<!-- ── Summary bar ── -->
+<div class="row g-2 mb-3">
+  <div class="col-auto">
+    <div class="card border-0 bg-success bg-opacity-10 px-3 py-2 d-flex flex-row align-items-center gap-2">
+      <span class="status-dot bg-success"></span>
+      <span class="small fw-500">ว่าง / เหลือน้อย <span class="badge bg-success ms-1">{{ summary.available }}</span></span>
+    </div>
+  </div>
+  <div class="col-auto">
+    <div class="card border-0 bg-danger bg-opacity-10 px-3 py-2 d-flex flex-row align-items-center gap-2">
+      <span class="status-dot bg-danger"></span>
+      <span class="small fw-500">งานเต็ม <span class="badge bg-danger ms-1">{{ summary.full }}</span></span>
+    </div>
+  </div>
+  <div class="col-auto">
+    <div class="card border-0 bg-secondary bg-opacity-10 px-3 py-2 d-flex flex-row align-items-center gap-2">
+      <span class="status-dot bg-secondary"></span>
+      <span class="small fw-500">ลา / ไม่มีเวร <span class="badge bg-secondary ms-1">{{ summary.off }}</span></span>
+    </div>
+  </div>
+  <div class="col-auto ms-auto">
+    <div class="card border-0 bg-primary bg-opacity-10 px-3 py-2 d-flex flex-row align-items-center gap-2">
+      <i class="bi bi-calendar-check text-primary"></i>
+      <span class="small fw-500">นัดทั้งหมดวันนี้ <span class="badge bg-primary ms-1">{{ summary.total_apts }}</span></span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Timeline header ruler ── -->
+<div class="card mb-2">
+  <div class="card-body py-2 px-3">
+    <div class="d-flex align-items-center gap-3">
+      <div class="tech-col"></div>
+      <div class="flex-fill position-relative" style="height:20px">
+        <!-- Hour markers at: 09 18.75 31.25 43.75 56.25 68.75 81.25 93.75 -->
+        {% for h, pct in ruler %}
+        <div style="position:absolute;left:{{ pct }}%;top:0;bottom:0;width:1px;background:#dee2e6"></div>
+        <span style="position:absolute;left:{{ pct }}%;font-size:.68rem;color:#adb5bd;transform:translateX(-50%)">{{ h }}</span>
+        {% endfor %}
+        <span style="position:absolute;left:0;font-size:.68rem;color:#adb5bd">08:30</span>
+        <span style="position:absolute;right:0;font-size:.68rem;color:#adb5bd;transform:translateX(50%)">16:30</span>
+      </div>
+      <div style="width:120px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Technician rows ── -->
+{% for row in rows %}
+<div class="card mb-2 dispatch-row
+  {% if row.status == 'off' or row.status == 'leave' %}opacity-60{% endif %}">
+  <div class="card-body py-2 px-3">
+    <div class="d-flex align-items-center gap-3">
+
+      <!-- Left: tech info -->
+      <div class="tech-col">
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <span class="rounded-circle flex-shrink-0"
+                style="width:12px;height:12px;background:{{ row.tech.color }}"></span>
+          <span class="fw-600 small text-truncate">{{ row.tech.full_name }}</span>
+          {% if row.status == 'available' %}
+            <span class="badge bg-success ms-auto">ว่าง</span>
+          {% elif row.status == 'limited' %}
+            <span class="badge bg-warning text-dark ms-auto">เหลือน้อย</span>
+          {% elif row.status == 'full' %}
+            <span class="badge bg-danger ms-auto">เต็ม</span>
+          {% elif row.status == 'leave' %}
+            <span class="badge bg-secondary ms-auto">ลา</span>
+          {% else %}
+            <span class="badge bg-light text-muted border ms-auto">ไม่มีเวร</span>
+          {% endif %}
+        </div>
+        {% if row.available %}
+        <div class="d-flex align-items-center gap-1 mb-1">
+          <div class="capacity-bar flex-fill">
+            {% with pct=row.busy_min|default:0 %}
+            <div class="capacity-fill
+              {% if row.status == 'full' %}bg-danger
+              {% elif row.status == 'limited' %}bg-warning
+              {% else %}bg-success{% endif %}"
+              style="width:{% widthratio row.busy_min 480 100 %}%"></div>
+            {% endwith %}
+          </div>
+          <span class="text-muted" style="font-size:.68rem;flex-shrink:0">{{ row.busy_min }}/480 นาที</span>
+        </div>
+        <div style="font-size:.68rem" class="text-muted">
+          {{ row.apts|length }} งาน · เหลือ {{ row.remaining }} นาที
+        </div>
+        {% else %}
+        <div style="font-size:.68rem" class="text-muted">
+          {% if row.on_leave %}ลาหยุด{% else %}ไม่ได้กำหนดเวรวันนี้{% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Timeline -->
+      <div class="timeline-wrap {% if not row.available %}unavailable{% endif %}">
+        {% if not row.available %}
+        <div class="d-flex align-items-center justify-content-center h-100 text-muted small">
+          {% if row.on_leave %}ลา / หยุด{% else %}ไม่มีเวร{% endif %}
+        </div>
+        {% else %}
+        <!-- hour grid lines -->
+        <div class="hour-marker" style="left:6.25%"></div>
+        <div class="hour-marker" style="left:18.75%"></div>
+        <div class="hour-marker" style="left:31.25%"></div>
+        <div class="hour-marker" style="left:43.75%"></div>
+        <div class="hour-marker" style="left:56.25%"></div>
+        <div class="hour-marker" style="left:68.75%"></div>
+        <div class="hour-marker" style="left:81.25%"></div>
+        <div class="hour-marker" style="left:93.75%"></div>
+        {% for block in row.blocks %}
+        <div class="apt-block"
+             style="left:{{ block.left }}%;width:{{ block.width }}%;
+                    background:{{ row.tech.color }}30;
+                    border-left-color:{{ row.tech.color }}"
+             onclick="location.href='{% url 'appointments:appointment_detail' block.apt.pk %}'"
+             title="{{ block.apt.equipment.name }} | {{ block.apt.start_time|time:'H:i' }}–{{ block.apt.end_time|time:'H:i' }} | {{ block.apt.equipment.customer.name }}">
+          <span style="color:{{ row.tech.color }}">{{ block.apt.equipment.name }}</span>
+        </div>
+        {% endfor %}
+        {% endif %}
+      </div>
+
+      <!-- Quick book -->
+      <div style="width:120px;flex-shrink:0">
+        {% if row.available and row.status != 'full' %}
+        <a href="{% url 'appointments:appointment_create' %}?technician={{ row.tech.pk }}&date={{ selected_date|date:'Y-m-d' }}"
+           class="btn btn-outline-primary btn-sm w-100">
+          <i class="bi bi-plus-circle me-1"></i>จองช่างนี้
+        </a>
+        {% if row.apts %}
+        <div class="text-center mt-1" style="font-size:.68rem;color:#6c757d">
+          {% for apt in row.apts|slice:":2" %}
+          <div class="text-truncate">{{ apt.start_time|time:"H:i" }} {{ apt.equipment.name }}</div>
+          {% endfor %}
+          {% if row.apts|length > 2 %}<div>+{{ row.apts|length|add:"-2" }} อื่น</div>{% endif %}
+        </div>
+        {% endif %}
+        {% elif row.status == 'full' %}
+        <button class="btn btn-outline-secondary btn-sm w-100" disabled>
+          <i class="bi bi-slash-circle me-1"></i>งานเต็ม
+        </button>
+        {% else %}
+        <button class="btn btn-outline-secondary btn-sm w-100" disabled>
+          <i class="bi bi-dash-circle me-1"></i>ไม่ว่าง
+        </button>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</div>
+{% empty %}
+<div class="card"><div class="card-body text-center text-muted py-5">ยังไม่มีช่างในระบบ</div></div>
+{% endfor %}
+
+{% if ot_rows %}
+<!-- ── OT Section ── -->
+<div class="mt-4">
+  <h6 class="border-bottom pb-2 mb-3 d-flex align-items-center gap-2">
+    <i class="bi bi-moon-stars text-warning"></i>
+    <span>{{ ot_label }}</span>
+    <span class="badge badge-overtime ms-1">{{ ot_rows|length }} คน</span>
+  </h6>
+
+  <!-- OT ruler -->
+  <div class="card mb-2">
+    <div class="card-body py-2 px-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="tech-col"></div>
+        <div class="flex-fill position-relative" style="height:20px">
+          {% for h, pct in ot_ruler %}
+          <div style="position:absolute;left:{{ pct }}%;top:0;bottom:0;width:1px;background:#dee2e6"></div>
+          <span style="position:absolute;left:{{ pct }}%;font-size:.68rem;color:#adb5bd;transform:translateX(-50%)">{{ h }}</span>
+          {% endfor %}
+          <span style="position:absolute;left:0;font-size:.68rem;color:#adb5bd">{{ ot_start_str }}</span>
+          <span style="position:absolute;right:0;font-size:.68rem;color:#adb5bd;transform:translateX(50%)">{{ ot_end_str }}</span>
+        </div>
+        <div style="width:120px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OT rows -->
+  {% for row in ot_rows %}
+  <div class="card mb-2 dispatch-row{% if row.status == 'leave' %} opacity-60{% endif %}">
+    <div class="card-body py-2 px-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="tech-col">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="rounded-circle flex-shrink-0"
+                  style="width:12px;height:12px;background:{{ row.tech.color }}"></span>
+            <span class="fw-600 small text-truncate">{{ row.tech.full_name }}</span>
+            {% if row.status == 'available' %}<span class="badge badge-overtime ms-auto">ว่าง OT</span>
+            {% elif row.status == 'limited' %}<span class="badge bg-warning text-dark ms-auto">เหลือน้อย</span>
+            {% elif row.status == 'full' %}<span class="badge bg-danger ms-auto">เต็ม</span>
+            {% elif row.status == 'leave' %}<span class="badge bg-secondary ms-auto">ลา</span>
+            {% endif %}
+          </div>
+          {% if not row.on_leave %}
+          <div style="font-size:.68rem" class="text-muted">
+            {{ row.apts|length }} งาน · เหลือ {{ row.remaining }} นาที
+          </div>
+          {% endif %}
+        </div>
+        <div class="timeline-wrap {% if row.on_leave %}unavailable{% endif %}">
+          {% if row.on_leave %}
+          <div class="d-flex align-items-center justify-content-center h-100 text-muted small">ลาหยุด</div>
+          {% else %}
+          {% for h, pct in ot_ruler %}
+          <div class="hour-marker" style="left:{{ pct }}%"></div>
+          {% endfor %}
+          {% for block in row.blocks %}
+          <div class="apt-block"
+               style="left:{{ block.left }}%;width:{{ block.width }}%;
+                      background:{{ row.tech.color }}30;border-left-color:{{ row.tech.color }}"
+               onclick="location.href='{% url 'appointments:appointment_detail' block.apt.pk %}'"
+               title="{{ block.apt.equipment.name }} | {{ block.apt.start_time|time:'H:i' }}–{{ block.apt.end_time|time:'H:i' }}">
+            <span style="color:{{ row.tech.color }}">{{ block.apt.equipment.name }}</span>
+          </div>
+          {% endfor %}
+          {% endif %}
+        </div>
+        <div style="width:120px;flex-shrink:0">
+          {% if not row.on_leave and row.status != 'full' %}
+          <a href="{% url 'appointments:appointment_create' %}?technician={{ row.tech.pk }}&date={{ selected_date|date:'Y-m-d' }}"
+             class="btn btn-warning btn-sm w-100">
+            <i class="bi bi-plus-circle me-1"></i>จอง OT
+          </a>
+          {% else %}
+          <button class="btn btn-outline-secondary btn-sm w-100" disabled>
+            <i class="bi bi-dash-circle me-1"></i>ไม่ว่าง
+          </button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% elif not is_weekday %}
+<div class="card mt-4 border-warning">
+  <div class="card-body text-center text-muted py-4">
+    <i class="bi bi-moon-stars fs-3 d-block mb-2 text-warning"></i>
+    วันหยุดสุดสัปดาห์ – ยังไม่มีช่างลงทะเบียนนอกเวลาวันนี้<br>
+    <small>ไปที่หน้าข้อมูลช่าง เพื่อลงทะเบียนวันทำงาน</small>
+  </div>
+</div>
+{% endif %}
+
+</div>{# end col-lg-9 #}
+
+<!-- ── Right: OT schedule sidebar ── -->
+<div class="col-lg-3">
+  <div class="card sticky-top" style="top:70px">
+    <div class="card-header fw-600 py-2 small">
+      <i class="bi bi-calendar-week text-warning me-2"></i>ตารางนอกเวลา 14 วัน
+    </div>
+    {% if upcoming_ot_schedule %}
+    <div class="list-group list-group-flush" style="max-height:75vh;overflow-y:auto">
+      {% for entry in upcoming_ot_schedule %}
+      <a href="?date={{ entry.date|date:'Y-m-d' }}"
+         class="list-group-item list-group-item-action py-2 px-3
+                {% if entry.date == selected_date %}active{% endif %}">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <span class="fw-500 small">{{ entry.date|date:"D d/m" }}</span>
+          <span class="badge {% if entry.date == selected_date %}bg-white text-primary{% else %}bg-primary{% endif %} rounded-pill">
+            {{ entry.items|length }}
+          </span>
+        </div>
+        <div class="d-flex flex-wrap gap-1">
+          {% for ot in entry.items %}
+          <span class="badge {% if ot.is_weekday %}badge-overtime{% else %}badge-weekend{% endif %}"
+                style="font-size:.65rem">
+            {{ ot.technician.first_name }}
+            <span class="opacity-75">{{ ot.start_time_str }}</span>
+          </span>
+          {% endfor %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-body text-muted small text-center py-4">
+      ไม่มีช่างลงทะเบียนนอกเวลา<br>ใน 14 วันข้างหน้า
+    </div>
+    {% endif %}
+    <div class="card-footer py-2 text-center">
+      <a href="{% url 'appointments:technician_list' %}" class="btn btn-outline-warning btn-sm w-100">
+        <i class="bi bi-person-plus me-1"></i>จัดการตารางช่าง
+      </a>
+    </div>
+  </div>
+</div>
+
+</div>{# end row #}
+{% endblock %}

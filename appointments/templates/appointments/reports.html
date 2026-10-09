@@ -1,0 +1,184 @@
+{% extends "appointments/base.html" %}
+{% block title %}รายงาน – CMMS{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">รายงาน</li>{% endblock %}
+
+{% block content %}
+
+<!-- ── Date range ── -->
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label small fw-500 mb-1">ตั้งแต่</label>
+        <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-500 mb-1">ถึง</label>
+        <input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-bar-chart me-1"></i>สร้างรายงาน
+        </button>
+      </div>
+      <div class="col-auto ms-auto d-flex gap-1 flex-wrap">
+        <a href="?date_from={{ presets.this_month.0 }}&date_to={{ presets.this_month.1 }}"
+           class="btn btn-outline-secondary btn-sm">เดือนนี้</a>
+        <a href="?date_from={{ presets.last_month.0 }}&date_to={{ presets.last_month.1 }}"
+           class="btn btn-outline-secondary btn-sm">เดือนที่แล้ว</a>
+        <a href="?date_from={{ presets.last_90.0 }}&date_to={{ presets.last_90.1 }}"
+           class="btn btn-outline-secondary btn-sm">90 วัน</a>
+        <a href="?date_from={{ presets.this_year.0 }}&date_to={{ presets.this_year.1 }}"
+           class="btn btn-outline-secondary btn-sm">ปีนี้</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="text-muted small mb-3">
+  <i class="bi bi-calendar-range me-1"></i>
+  ช่วง {{ date_from|date:"d/m/Y" }} – {{ date_to|date:"d/m/Y" }}
+</div>
+
+<!-- ── Summary stat cards ── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card stat-card h-100" style="border-left-color:#0d6efd">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#0d6efd22;color:#0d6efd"><i class="bi bi-calendar-check"></i></div>
+        <div>
+          <div class="fs-2 fw-bold lh-1">{{ total }}</div>
+          <div class="text-muted small">นัดหมายทั้งหมด</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card h-100" style="border-left-color:#198754">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#19875422;color:#198754"><i class="bi bi-patch-check"></i></div>
+        <div>
+          <div class="fs-2 fw-bold lh-1 text-success">{{ completed }}</div>
+          <div class="text-muted small">เสร็จสิ้น</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card h-100" style="border-left-color:#fd7e14">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#fd7e1422;color:#fd7e14"><i class="bi bi-hourglass-split"></i></div>
+        <div>
+          <div class="fs-2 fw-bold lh-1 text-warning">{{ pending }}</div>
+          <div class="text-muted small">รอดำเนินการ</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card h-100" style="border-left-color:#6f42c1">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon" style="background:#6f42c122;color:#6f42c1"><i class="bi bi-clock-history"></i></div>
+        <div>
+          <div class="fs-2 fw-bold lh-1" style="color:#6f42c1">{{ total_hours }}</div>
+          <div class="text-muted small">ชั่วโมงงาน (เสร็จ)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Technician + Service type ── -->
+<div class="row g-3 mb-4">
+
+  <!-- Technician workload -->
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header fw-600"><i class="bi bi-people me-2 text-success"></i>ภาระงานช่าง</div>
+      <div class="card-body p-0">
+        <table class="table table-hover small mb-0">
+          <thead class="table-light">
+            <tr><th>ช่าง</th><th class="text-center">ทั้งหมด</th><th class="text-center">เสร็จ</th><th class="text-center">ชั่วโมง</th><th>% เสร็จ</th></tr>
+          </thead>
+          <tbody>
+            {% for r in tech_rows %}
+            <tr>
+              <td>
+                <span class="rounded-circle d-inline-block me-1"
+                      style="width:9px;height:9px;background:{{ r.technician__color }}"></span>
+                {{ r.name }}
+              </td>
+              <td class="text-center">{{ r.cnt }}</td>
+              <td class="text-center fw-500 text-success">{{ r.done }}</td>
+              <td class="text-center">{{ r.hours }}</td>
+              <td style="width:120px">
+                {% if r.cnt > 0 %}
+                <div class="d-flex align-items-center gap-1">
+                  <div class="flex-fill bg-light rounded" style="height:6px;overflow:hidden">
+                    <div class="bg-success rounded" style="height:6px;width:{% widthratio r.done r.cnt 100 %}%"></div>
+                  </div>
+                  <span class="text-muted" style="font-size:.7rem;width:28px">{% widthratio r.done r.cnt 100 %}%</span>
+                </div>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center text-muted py-4">ไม่มีข้อมูล</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Service type -->
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header fw-600"><i class="bi bi-pie-chart me-2 text-info"></i>ประเภทงาน</div>
+      <div class="card-body">
+        {% for r in svc_rows %}
+        <div class="mb-3">
+          <div class="d-flex justify-content-between small mb-1">
+            <span class="fw-500">{{ r.label }}</span>
+            <span class="text-muted">{{ r.done }}/{{ r.cnt }} เสร็จ</span>
+          </div>
+          <div class="bg-light rounded" style="height:12px;overflow:hidden">
+            <div class="rounded" style="height:12px;width:{% widthratio r.cnt svc_max 100 %}%;
+                 background:{% if r.service_type == 'PM' %}#198754{% elif r.service_type == 'CAL' %}#0dcaf0{% elif r.service_type == 'PM_CAL' %}#0d6efd{% else %}#fd7e14{% endif %}"></div>
+          </div>
+          <div class="text-muted" style="font-size:.7rem">{{ r.cnt }} งาน</div>
+        </div>
+        {% empty %}
+        <div class="text-muted text-center py-4">ไม่มีข้อมูล</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Top customers ── -->
+<div class="card">
+  <div class="card-header fw-600"><i class="bi bi-hospital me-2 text-info"></i>ลูกค้าสูงสุด 10 อันดับ</div>
+  <div class="card-body">
+    {% for r in cust_rows %}
+    <div class="mb-2">
+      <div class="d-flex justify-content-between small mb-1">
+        <span class="fw-500 text-truncate" style="max-width:60%">
+          {{ r.equipment__customer__code }} – {{ r.equipment__customer__name }}
+        </span>
+        <span class="text-muted">{{ r.done }}/{{ r.cnt }} เสร็จ</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <div class="flex-fill bg-light rounded" style="height:10px;overflow:hidden">
+          <div class="bg-primary rounded" style="height:10px;width:{% widthratio r.cnt cust_max 100 %}%"></div>
+        </div>
+        <span class="text-muted small" style="width:40px;text-align:right">{{ r.cnt }} งาน</span>
+      </div>
+    </div>
+    {% empty %}
+    <div class="text-muted text-center py-4">ไม่มีข้อมูล</div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}

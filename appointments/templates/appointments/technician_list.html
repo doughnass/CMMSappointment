@@ -1,0 +1,94 @@
+{% extends "appointments/base.html" %}
+{% block title %}ช่างเทคนิค – CMMS{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">ช่างเทคนิค</li>{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <h5 class="mb-0"><i class="bi bi-people me-2 text-success"></i>ช่างเทคนิค</h5>
+  <div class="d-flex gap-2">
+    <a href="{% url 'appointments:technician_skill' %}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-diagram-3"></i> วิเคราะห์ทักษะ
+    </a>
+    <a href="{% url 'appointments:technician_create' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg"></i> เพิ่มช่าง
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  {% for tech in technicians %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <!-- Header row -->
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold fs-4"
+               style="width:52px;height:52px;background:{{ tech.color }};flex-shrink:0">
+            {{ tech.first_name|first }}
+          </div>
+          <div class="flex-grow-1">
+            <div class="fw-bold">{{ tech.full_name }}</div>
+            <div class="text-muted small">{{ tech.employee_id }}</div>
+          </div>
+          {% if tech.available_today %}
+          <span class="badge bg-success-subtle text-success border border-success-subtle">ปฏิบัติงาน</span>
+          {% else %}
+          <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">ไม่อยู่วันนี้</span>
+          {% endif %}
+        </div>
+
+        <!-- Info -->
+        <div class="small text-muted mb-2">
+          <i class="bi bi-telephone me-1"></i>{{ tech.phone }}
+          {% if tech.email %}| <i class="bi bi-envelope me-1"></i>{{ tech.email }}{% endif %}
+        </div>
+
+        <!-- Work days -->
+        <div class="d-flex flex-wrap gap-1 mb-2">
+          {% for wd in tech.work_days.all %}
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+            {{ wd.get_day_of_week_display }}
+          </span>
+          {% empty %}
+          <span class="text-muted small">ยังไม่กำหนดวันทำงาน</span>
+          {% endfor %}
+        </div>
+
+        <!-- Skills -->
+        <div class="d-flex flex-wrap gap-1 mb-3">
+          {% for skill in tech.skills.all %}
+          <span class="badge bg-light text-dark border">{{ skill.name }}</span>
+          {% empty %}
+          <span class="text-muted small">ยังไม่มีทักษะ</span>
+          {% endfor %}
+        </div>
+
+        {% if tech.today_count > 0 %}
+        <div class="text-primary small mb-2">
+          <i class="bi bi-calendar-check me-1"></i>วันนี้มีนัดหมาย {{ tech.today_count }} รายการ
+        </div>
+        {% endif %}
+
+        <!-- Actions -->
+        <div class="d-flex gap-2 mt-auto">
+          <a href="{% url 'appointments:technician_detail' tech.pk %}" class="btn btn-sm btn-outline-primary flex-fill">
+            <i class="bi bi-eye"></i> ดูรายละเอียด
+          </a>
+          <a href="{% url 'appointments:technician_update' tech.pk %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-pencil"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col-12 text-center text-muted py-5">
+    <i class="bi bi-people fs-2 d-block mb-2"></i>
+    ยังไม่มีช่างในระบบ
+    <div class="mt-2">
+      <a href="{% url 'appointments:technician_create' %}" class="btn btn-primary btn-sm">เพิ่มช่างคนแรก</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

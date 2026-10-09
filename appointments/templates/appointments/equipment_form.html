@@ -1,0 +1,219 @@
+{% extends "appointments/base.html" %}
+{% block title %}{% if equipment %}แก้ไข{% else %}เพิ่ม{% endif %}เครื่องมือแพทย์ – CMMS{% endblock %}
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'appointments:equipment_list' %}">เครื่องมือแพทย์</a></li>
+  <li class="breadcrumb-item active">{% if equipment %}แก้ไข: {{ equipment.name }}{% else %}เพิ่มเครื่องมือใหม่{% endif %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-9">
+    <div class="card">
+      <div class="card-header fw-600">
+        <i class="bi bi-heart-pulse me-2 text-primary"></i>
+        {% if equipment %}แก้ไขข้อมูลเครื่องมือ{% else %}เพิ่มเครื่องมือแพทย์ใหม่{% endif %}
+      </div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <!-- General Info -->
+          <h6 class="text-muted mb-3 mt-1 border-bottom pb-2">ข้อมูลทั่วไป</h6>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="form-label fw-500">รหัสเครื่อง <span class="text-danger">*</span></label>
+              {{ form.equipment_code }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-500">ชื่อเครื่อง <span class="text-danger">*</span></label>
+              <select id="id_name" name="selected_skill_id" class="form-control">
+                {% if equipment %}
+                  {% if equipment.repair_required_skills.exists %}
+                    {% for s in equipment.repair_required_skills.all %}
+                      <option value="{{ s.pk }}" selected>{{ s.name }}{% if s.name_th %} — {{ s.name_th }}{% endif %}</option>
+                    {% endfor %}
+                  {% else %}
+                    <option value="" selected>{{ equipment.name }}{% if equipment.name_th %} — {{ equipment.name_th }}{% endif %}</option>
+                  {% endif %}
+                {% endif %}
+              </select>
+              <input type="hidden" id="id_name_hidden" name="name" value="{% if equipment %}{{ equipment.name|escape }}{% else %}{{ form.name.value|default_if_none:'' }}{% endif %}">
+              {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-500">ชื่อเครื่องภาษาไทย</label>
+              {{ form.name_th }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-500">ยี่ห้อ</label>
+              {{ form.manufacturer }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-500">รุ่น</label>
+              {{ form.model }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-500">SerialNo <span class="text-danger">*</span></label>
+              {{ form.serial_number }}
+              {% if form.serial_number.errors %}<div class="text-danger small">{{ form.serial_number.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-500">เลขครุภัณฑ์</label>
+              {{ form.asset_number }}
+            </div>
+            <!-- <div class="col-md-6">
+              <label class="form-label fw-500">ชื่อหน่วยงานที่ใช้เครื่อง</label>
+              {{ form.department }}
+            </div> -->
+            <div class="col-md-6">
+              <label class="form-label fw-500">หน่วยงานผู้ใช้เครื่องมือ <span class="text-danger">*</span></label>
+              {{ form.customer }}
+              {% if form.customer.errors %}<div class="text-danger small">{{ form.customer.errors|join:", " }}</div>{% endif %}
+            </div>
+          </div>
+
+          <!-- PM Section -->
+          <h6 class="text-muted mb-3 mt-2 border-bottom pb-2">
+            <i class="bi bi-tools me-1"></i> การบำรุงรักษา (PM)
+          </h6>
+          <div class="row g-3 mb-3">
+            <div class="col-md-3">
+              <label class="form-label fw-500">ระยะเวลา PM (นาที) <span class="text-danger">*</span></label>
+              {{ form.maintenance_duration_minutes }}
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-500">รอบ PM (เดือน)</label>
+              {{ form.maintenance_interval_months }}
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-500">PM ล่าสุด</label>
+              {{ form.last_maintenance_date }}
+              <div class="form-text">ระบบจะคำนวณวันถัดไปอัตโนมัติ</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-500">PM ครั้งถัดไป</label>
+              {{ form.next_maintenance_date }}
+              <div class="form-text">หรือระบุเองได้</div>
+            </div>
+          </div>
+
+          <!-- Calibration Section -->
+          <h6 class="text-muted mb-3 mt-2 border-bottom pb-2">
+            <i class="bi bi-rulers me-1 text-info"></i> การสอบเทียบ (Calibration)
+          </h6>
+          <div class="mb-3 form-check">
+            {{ form.requires_calibration }}
+            <label class="form-check-label fw-500" for="id_requires_calibration">
+              เครื่องมือนี้ต้องสอบเทียบ
+            </label>
+          </div>
+          <div id="calibration-fields" class="row g-3 mb-3">
+            <div class="col-md-3">
+              <label class="form-label fw-500">ระยะเวลาสอบเทียบ (นาที)</label>
+              {{ form.calibration_duration_minutes }}
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-500">รอบสอบเทียบ (เดือน)</label>
+              {{ form.calibration_interval_months }}
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-500">สอบเทียบล่าสุด</label>
+              {{ form.last_calibration_date }}
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-500">สอบเทียบครั้งถัดไป</label>
+              {{ form.next_calibration_date }}
+            </div>
+          </div>
+
+          
+
+          <!-- Active -->
+          <div class="form-check mb-4">
+            {{ form.is_active }}
+            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">ใช้งาน</label>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-save me-1"></i> บันทึก
+            </button>
+            <a href="{% if equipment %}{% url 'appointments:equipment_detail' equipment.pk %}{% else %}{% url 'appointments:equipment_list' %}{% endif %}"
+               class="btn btn-outline-secondary">ยกเลิก</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleCalibration(checkbox) {
+  const fields = document.getElementById('calibration-fields');
+  const calSkills = document.getElementById('calibration-skill-wrap');
+  fields.style.display = checkbox.checked ? 'flex' : 'none';
+  if (calSkills) {
+    calSkills.style.display = checkbox.checked ? 'block' : 'none';
+  }
+}
+// Init on page load
+document.addEventListener('DOMContentLoaded', function () {
+  const cb = document.getElementById('id_requires_calibration');
+  if (cb) toggleCalibration(cb);
+});
+
+/* Select2 autocomplete for equipment name (search Skill table) */
+(function () {
+  // Load jQuery and Select2 from CDN then init
+  const loadScript = (src) => new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s);
+  });
+  const loadCss = href => {
+    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.appendChild(l);
+  };
+
+  loadCss('https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css');
+  (async function initSelect2() {
+    if (typeof window.jQuery === 'undefined') {
+      await loadScript('https://code.jquery.com/jquery-3.6.0.min.js');
+    }
+    if (typeof window.jQuery.fn.select2 === 'undefined') {
+      await loadScript('https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js');
+    }
+
+    const $ = window.jQuery;
+    const $el = $('#id_name');
+    if (!$el.length) return;
+
+    $el.select2({
+      placeholder: 'พิมพ์เพื่อค้นหาจากทักษะ...',
+      allowClear: true,
+      ajax: {
+        url: '{% url "appointments:api_skill_search" %}',
+        dataType: 'json',
+        delay: 250,
+        cache: true,
+        data: function (params) { return { q: params.term || '' }; },
+        processResults: function (data) {
+          const results = (data.results || []).map(function (r) {
+            return { id: r.id, text: r.name, name: r.name };
+          });
+          return { results: results };
+        },
+      },
+      minimumInputLength: 0,
+      width: '100%'
+    });
+
+    // keep a hidden name field in sync so server receives `name` and we also send `selected_skill_id`
+    $el.on('select2:select', function (e) {
+      const data = e.params.data;
+      $('#id_name_hidden').val(data.name || data.text);
+    });
+    $el.on('select2:unselect', function () { $('#id_name_hidden').val(''); });
+  })();
+})();
+</script>
+{% endblock %}

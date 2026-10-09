@@ -1,0 +1,53 @@
+{% extends "appointments/base.html" %}
+{% block title %}ลบลูกค้า – CMMS{% endblock %}
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'appointments:customer_list' %}">ลูกค้า</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'appointments:customer_detail' customer.pk %}">{{ customer.name }}</a></li>
+  <li class="breadcrumb-item active">ลบ</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-5">
+    <div class="card border-danger">
+      <div class="card-header bg-danger text-white fw-600">
+        <i class="bi bi-exclamation-triangle me-2"></i>ยืนยันการลบลูกค้า
+      </div>
+      <div class="card-body">
+        <p class="mb-1">คุณต้องการลบลูกค้า:</p>
+        <p class="fw-bold fs-6 mb-3">{{ customer.code }} – {{ customer.name }}</p>
+
+        {% if equipment_count > 0 %}
+        <div class="alert alert-danger d-flex align-items-start gap-2 mb-3">
+          <i class="bi bi-x-circle-fill mt-1 flex-shrink-0"></i>
+          <div>
+            <strong>ไม่สามารถลบได้</strong><br>
+            มีเครื่องมือแพทย์ <strong>{{ equipment_count }} รายการ</strong> ที่ผูกกับลูกค้านี้อยู่
+            กรุณาย้ายหรือลบเครื่องมือก่อน
+          </div>
+        </div>
+        <a href="{% url 'appointments:customer_detail' customer.pk %}" class="btn btn-secondary w-100">
+          <i class="bi bi-arrow-left me-1"></i>กลับ
+        </a>
+        {% else %}
+        <div class="alert alert-warning d-flex align-items-start gap-2 mb-3">
+          <i class="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0"></i>
+          <div>การดำเนินการนี้<strong>ไม่สามารถย้อนกลับได้</strong> ข้อมูลลูกค้าและผู้ติดต่อทั้งหมดจะถูกลบ</div>
+        </div>
+        <form method="post">
+          {% csrf_token %}
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-danger flex-fill">
+              <i class="bi bi-trash me-1"></i>ลบถาวร
+            </button>
+            <a href="{% url 'appointments:customer_detail' customer.pk %}" class="btn btn-outline-secondary flex-fill">
+              ยกเลิก
+            </a>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
