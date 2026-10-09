@@ -1,4 +1,5 @@
 {% extends "appointments/base.html" %}
+{% load static %}
 {% block title %}{% if appointment %}แก้ไข{% else %}สร้าง{% endif %}นัดหมาย – CMMS{% endblock %}
 {% block breadcrumb %}
   <li class="breadcrumb-item"><a href="{% url 'appointments:appointment_list' %}">นัดหมาย</a></li>
@@ -7,67 +8,7 @@
 
 {% block extra_head %}
 <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
-<style>
-  :root { --form-ink: #17324d; --form-accent: #0d6efd; --form-soft: #f4f8fc; }
-  .appointment-intro { border-left: 4px solid var(--form-accent); padding-left: 14px; }
-  .appointment-intro h1 { color: var(--form-ink); letter-spacing: 0; }
-  .flow-nav { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
-  .flow-step { background: #fff; border: 1px solid #dbe5ef; border-radius: 999px; color: #64748b; font-size: .8rem; padding: 7px 12px; white-space: nowrap; }
-  .flow-step.active { background: #e8f1ff; border-color: #9fc2ff; color: #0757bd; font-weight: 600; }
-  .form-section-title { color: var(--form-ink); font-size: 1rem; margin-top: 1.5rem; }
-  .form-section-title:first-of-type { margin-top: 0; }
-  .form-section-title .badge { align-items: center; display: inline-flex; height: 25px; justify-content: center; min-width: 25px !important; }
-  .field-label { color: #334155; }
-  .field-help { color: #64748b; font-size: .78rem; }
-  #equipment-info { background: var(--form-soft); border-radius: 6px; padding: 7px 10px; }
-  .time-panel { background: var(--form-soft); border: 1px solid #e2eaf3; border-radius: 8px; padding: 12px; }
-  .form-actions { border-top: 1px solid #e2e8f0; margin-top: 1.5rem; padding-top: 1rem; }
-  .summary-card { border-top: 4px solid var(--form-accent); }
-  .summary-card .list-group-item { border-color: #edf1f5; }
-  .summary-value { overflow-wrap: anywhere; }
-  @media (max-width: 767.98px) {
-    .appointment-intro { margin-bottom: 12px; }
-    .appointment-intro h1 { font-size: 1.35rem; }
-    .form-actions { position: sticky; bottom: 0; background: #fff; margin-left: -1rem; margin-right: -1rem; padding: 1rem; z-index: 10; }
-    .form-actions .btn { flex: 1; }
-  }
-  .availability-indicator { height: 10px; width: 10px; border-radius: 50%; display:inline-block; }
-  .calendar-legend { font-size: .78rem; }
-  .calendar-legend .legend-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; vertical-align: middle; margin-right: 4px; border: 1px solid rgba(0,0,0,.1); }
-  .flatpickr-day.day-available { background: #d1f7dd !important; border-color: #28a745 !important; color: #1e7e34 !important; }
-  .flatpickr-day.day-limited   { background: #fff3cd !important; border-color: #fd7e14 !important; color: #a15c00 !important; }
-  .flatpickr-day.day-full      { background: #f8d7da !important; border-color: #dc3545 !important; color: #a71d2a !important; }
-  .flatpickr-day.day-closed    { background: #e9ecef !important; border-color: #adb5bd !important; color: #868e96 !important; }
-  .flatpickr-day.selected.day-available,
-  .flatpickr-day.selected.day-limited,
-  .flatpickr-day.selected.day-full,
-  .flatpickr-day.selected.day-closed { background: #0d6efd !important; border-color: #0d6efd !important; color: #fff !important; }
-  .busy-slot { background: #fee2e2; border-radius: 6px; padding: 4px 8px; font-size: .8rem; margin: 2px 0; }
-  #availability-info { min-height: 40px; }
-  .time-type-badge { font-size: .85rem; padding: 4px 12px; border-radius: 20px; }
-  #equipment-search-results {
-    position: absolute; z-index: 20; width: 100%; max-height: 280px; overflow-y: auto;
-    background: #fff; border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 8px 8px;
-    box-shadow: 0 4px 10px rgba(0,0,0,.08);
-  }
-  #equipment-search-results .result-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f1f1f1; }
-  #equipment-search-results .result-item:hover { background: #f0f7ff; }
-  #equipment-search-results .result-item:last-child { border-bottom: none; }
-  .tech-suggest-card {
-    border: 1px solid #dee2e6; border-radius: 8px; padding: 10px 12px; cursor: pointer;
-    transition: box-shadow .15s, border-color .15s;
-  }
-  .tech-suggest-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-  .tech-suggest-card.selected { border-color: #0d6efd; background: #f0f7ff; }
-  .tech-suggest-card.unavailable { opacity: .55; }
-  .capacity-badge { font-size: .75rem; }
-  .ai-recommendation { background: #eef8f5; border: 1px solid #a9ddcc; border-left: 4px solid #159570; border-radius: 8px; padding: 12px 14px; }
-  .ai-recommendation .recommendation-name { color: #106b55; font-size: 1rem; font-weight: 700; }
-  .ai-recommendation.no-match { background: #fff4f2; border-color: #f0b8af; border-left-color: #dc3545; }
-  .ai-recommendation.no-match .recommendation-name { color: #a5281c; }
-  .date-recommendations { background: #fffaf0; border: 1px solid #f3d48b; border-radius: 8px; padding: 10px; }
-  .date-recommendation { background: #fff; border: 1px solid #f0c36d; color: #815b12; font-size: .78rem; padding: 5px 9px; }
-</style>
+<link href="{% static 'appointments/css/appointment_form.css' %}" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -99,6 +40,7 @@
           {% if form.non_field_errors %}
           <div class="alert alert-danger py-2">{{ form.non_field_errors }}</div>
           {% endif %}
+          <div id="form-api-error" class="alert alert-warning d-none py-2 small" role="alert"></div>
 
           <!-- Equipment & Service -->
           <h6 class="form-section-title border-bottom pb-2 mb-3 d-flex align-items-center gap-2">
@@ -118,7 +60,7 @@
               <div id="equipment-info" class="form-text text-primary mt-2" aria-live="polite"></div>
             </div>
             <div class="col-md-4">
-              <label class="form-label field-label fw-500">ประเภทงาน <span class="text-danger">*</span></label>
+              <label class="form-label field-label fw-500" for="{{ form.service_type.id_for_label }}">ประเภทงาน <span class="text-danger">*</span></label>
               {{ form.service_type }}
             </div>
           </div>
@@ -129,7 +71,7 @@
           </h6>
           <div class="row g-3 mb-3">
             <div class="col-md-4">
-              <label class="form-label field-label fw-500">วันที่นัด <span class="text-danger">*</span></label>
+              <label class="form-label field-label fw-500" for="{{ form.scheduled_date.id_for_label }}">วันที่นัด <span class="text-danger">*</span></label>
               {{ form.scheduled_date }}
               {% if form.scheduled_date.errors %}<div class="text-danger small">{{ form.scheduled_date.errors|join:", " }}</div>{% endif %}
               <div id="date-recommendations" class="date-recommendations d-none mt-2" aria-live="polite"></div>
@@ -141,7 +83,7 @@
               </div>
             </div>
             <div class="col-md-8 visually-hidden">
-              <label class="form-label fw-500">ช่างเทคนิค <span class="text-danger">*</span></label>
+              <label class="form-label fw-500" for="{{ form.technician.id_for_label }}">ช่างเทคนิค <span class="text-danger">*</span></label>
               {{ form.technician }}
               {% if form.technician.errors %}<div class="text-danger small">{{ form.technician.errors|join:", " }}</div>{% endif %}
             </div>
@@ -157,12 +99,12 @@
           </div>
 
           <!-- Availability Info -->
-          <div id="availability-info" class="mb-3 small"></div>
+          <div id="availability-info" class="mb-3 small" aria-live="polite"></div>
 
           <!-- Times -->
           <div class="time-panel row g-3 mb-3">
             <div class="col-md-3">
-              <label class="form-label fw-500">เวลาเริ่ม <span class="text-danger">*</span></label>
+              <label class="form-label fw-500" for="{{ form.start_time.id_for_label }}">เวลาเริ่ม <span class="text-danger">*</span></label>
               {{ form.start_time }}
               {% if form.start_time.errors %}<div class="text-danger small">{{ form.start_time.errors|join:", " }}</div>{% endif %}
               <div class="d-flex flex-wrap gap-1 mt-1">
@@ -175,11 +117,11 @@
               </div>
             </div>
             <div class="col-md-3">
-              <label class="form-label fw-500">ระยะเวลา (นาที) <span class="text-danger">*</span></label>
+              <label class="form-label fw-500" for="{{ form.duration_minutes.id_for_label }}">ระยะเวลา (นาที) <span class="text-danger">*</span></label>
               {{ form.duration_minutes }}
             </div>
             <div class="col-md-3">
-              <label class="form-label fw-500">เวลาสิ้นสุด</label>
+              <label class="form-label fw-500" for="{{ form.end_time.id_for_label }}">เวลาสิ้นสุด</label>
               {{ form.end_time }}
               <div class="form-text">คำนวณจากเวลาเริ่ม + ระยะเวลา</div>
             </div>
@@ -198,18 +140,18 @@
           </h6>
           <div class="row g-3 mb-3">
             <div class="col-md-4">
-              <label class="form-label fw-500">สถานะ</label>
+              <label class="form-label fw-500" for="{{ form.status.id_for_label }}">สถานะ</label>
               {{ form.status }}
             </div>
             <div class="col-md-4">
-              <label class="form-label fw-500">ผู้ประสานงาน <span class="text-danger">*</span></label>
+              <label class="form-label fw-500" for="{{ form.coordinator_name.id_for_label }}">ผู้ประสานงาน <span class="text-danger">*</span></label>
               {{ form.coordinator_name }}
               {% if form.coordinator_name.errors %}<div class="text-danger small">{{ form.coordinator_name.errors|join:", " }}</div>{% endif %}
               <div class="form-text"><i class="bi bi-pin-angle me-1"></i>จำชื่อล่าสุดอัตโนมัติ</div>
             </div>
           </div>
           <div class="mb-4">
-            <label class="form-label fw-500">หมายเหตุ</label>
+            <label class="form-label fw-500" for="{{ form.notes.id_for_label }}">หมายเหตุ</label>
             {{ form.notes }}
           </div>
 
@@ -274,459 +216,5 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
-<script>
-const techniciansData = {{ technicians_json|safe }};
-
-const OFFICE_START = [8, 30];
-const OFFICE_END   = [16, 30];
-const OFFICE_DAYS  = [1, 2, 3, 4, 5]; // Mon-Fri (JS: 0=Sun)
-
-function isOfficeHours(dateStr, timeStr) {
-  if (!dateStr || !timeStr) return null;
-  const d = new Date(dateStr);
-  const dow = d.getDay(); // 0=Sun
-  if (!OFFICE_DAYS.includes(dow)) return false;
-  const [h, m] = timeStr.split(':').map(Number);
-  const t = h * 60 + m;
-  const s = OFFICE_START[0] * 60 + OFFICE_START[1];
-  const e = OFFICE_END[0] * 60 + OFFICE_END[1];
-  return t >= s && t < e;
-}
-
-function updateEndTime() {
-  const startVal = document.getElementById('id_start_time').value;
-  const durVal   = parseInt(document.getElementById('id_duration_minutes').value);
-  if (!startVal || isNaN(durVal) || durVal <= 0) return;
-  const [h, m] = startVal.split(':').map(Number);
-  const total = h * 60 + m + durVal;
-  const eh = Math.floor(total / 60) % 24;
-  const em = total % 60;
-  document.getElementById('id_end_time').value =
-    `${String(eh).padStart(2,'0')}:${String(em).padStart(2,'0')}`;
-  updateTimeTypeBadge();
-}
-
-function updateTimeTypeBadge() {
-  const dateVal  = document.getElementById('id_scheduled_date').value;
-  const startVal = document.getElementById('id_start_time').value;
-  const badge    = document.getElementById('time-type-display');
-  const office   = isOfficeHours(dateVal, startVal);
-  if (office === null) {
-    badge.innerHTML = '<span class="badge bg-secondary time-type-badge">–</span>';
-  } else if (office) {
-    badge.innerHTML = '<span class="badge badge-office time-type-badge"><i class="bi bi-sun me-1"></i>ในเวลาราชการ</span>';
-  } else {
-    badge.innerHTML = '<span class="badge badge-overtime time-type-badge"><i class="bi bi-moon me-1"></i>นอกเวลาราชการ</span>';
-  }
-}
-
-async function fetchEquipmentInfo(pk) {
-  const res = await fetch(`/api/equipment/${pk}/info/`);
-  return res.json();
-}
-
-async function fetchAvailability(techId, dateStr) {
-  if (!techId || !dateStr) return null;
-  const res = await fetch(`/api/technician-availability/?technician_id=${techId}&date=${dateStr}`);
-  return res.json();
-}
-
-function selectedServiceType() {
-  return document.getElementById('id_service_type').value || 'PM';
-}
-
-// ── Equipment select ──
-document.getElementById('id_equipment').addEventListener('change', async function () {
-  const pk = this.value;
-  const infoEl = document.getElementById('equipment-info');
-  if (!pk) { infoEl.textContent = ''; return; }
-  const data = await fetchEquipmentInfo(pk);
-  infoEl.innerHTML =
-    `${data.customer} – ${data.department || ''} | PM: ${data.maintenance_duration} นาที` +
-    (data.requires_calibration
-      ? ` + CAL: ${data.calibration_duration} นาที (รวม ${data.total_duration} นาที)`
-      : '') ;
-  document.getElementById('id_duration_minutes').value = data.total_duration;
-  const stEl = document.getElementById('id_service_type') || null;
-  if (stEl) stEl.value = data.default_service_type;
-  updateEndTime();
-  fetchTechSuggestions();
-  loadCalendarAvailability(datePicker);
-});
-
-// ── Equipment autocomplete search ──
-const eqSearchInput = document.getElementById('equipment-search-input');
-const eqSearchResults = document.getElementById('equipment-search-results');
-const eqSelect = document.getElementById('id_equipment');
-let eqSearchTimer = null;
-
-function renderEquipmentResults(results) {
-  if (!results.length) {
-    eqSearchResults.innerHTML = '<div class="result-item text-muted">ไม่พบเครื่องมือ</div>';
-  } else {
-    eqSearchResults.innerHTML = results.map(r => `
-      <div class="result-item" data-id="${r.id}" data-label="${r.code} – ${r.serial_number}">
-        <div class="fw-500">${r.code} <span class="text-muted">– ${r.serial_number}</span></div>
-        <div class="small text-muted">${r.name}${r.name_th ? ' (' + r.name_th + ')' : ''} | ${r.customer}${r.department ? ' – ' + r.department : ''}</div>
-      </div>
-    `).join('');
-  }
-  eqSearchResults.classList.remove('d-none');
-}
-
-async function searchEquipment(q) {
-  const res = await fetch(`/api/equipment-search/?q=${encodeURIComponent(q)}`);
-  const data = await res.json();
-  return data.results;
-}
-
-eqSearchInput.addEventListener('input', function () {
-  const q = this.value.trim();
-  clearTimeout(eqSearchTimer);
-  if (q.length < 1) { eqSearchResults.classList.add('d-none'); return; }
-  eqSearchTimer = setTimeout(async () => {
-    const results = await searchEquipment(q);
-    renderEquipmentResults(results);
-  }, 250);
-});
-
-eqSearchInput.addEventListener('focus', function () {
-  if (this.value.trim().length >= 1 && eqSearchResults.innerHTML) {
-    eqSearchResults.classList.remove('d-none');
-  }
-});
-
-document.addEventListener('click', function (e) {
-  if (!eqSearchResults.contains(e.target) && e.target !== eqSearchInput) {
-    eqSearchResults.classList.add('d-none');
-  }
-});
-
-eqSearchResults.addEventListener('click', function (e) {
-  const item = e.target.closest('.result-item[data-id]');
-  if (!item) return;
-  eqSelect.value = item.dataset.id;
-  eqSearchInput.value = item.dataset.label;
-  eqSearchResults.classList.add('d-none');
-  eqSelect.dispatchEvent(new Event('change'));
-  updateSummary();
-});
-
-// ── Technician suggestions (based on equipment code + date) ──
-async function fetchTechSuggestions() {
-  const eqId = eqSelect.value;
-  const dateStr = document.getElementById('id_scheduled_date').value;
-  const listEl = document.getElementById('tech-suggest-list');
-  const hintEl = document.getElementById('tech-suggest-hint');
-  const recommendationEl = document.getElementById('ai-recommendation');
-  if (!eqId || !dateStr) {
-    listEl.innerHTML = '';
-    recommendationEl.classList.add('d-none');
-    hintEl.classList.remove('d-none');
-    return;
-  }
-  hintEl.classList.add('d-none');
-  const res = await fetch(`/api/technician-suggestions/?equipment_id=${eqId}&date=${dateStr}&service_type=${encodeURIComponent(selectedServiceType())}`);
-  const data = await res.json();
-  if (data.error) { listEl.innerHTML = ''; recommendationEl.classList.add('d-none'); return; }
-
-  if (data.recommendation) {
-    recommendationEl.classList.remove('no-match');
-    recommendationEl.innerHTML = `<div class="d-flex align-items-start gap-2">
-      <i class="bi bi-stars text-success fs-5"></i>
-      <div><div class="small text-success fw-600">คำแนะนำอัจฉริยะจากข้อมูลระบบ</div>
-      <div class="recommendation-name">${data.recommendation.name}</div>
-      <div class="small text-muted">${data.recommendation.reasons.join(' · ')}</div></div>
-    </div>`;
-    recommendationEl.classList.remove('d-none');
-  } else if (data.message) {
-    recommendationEl.classList.add('no-match');
-    recommendationEl.innerHTML = `<div class="d-flex align-items-start gap-2">
-      <i class="bi bi-exclamation-triangle text-danger fs-5"></i>
-      <div><div class="small text-danger fw-600">ยังไม่สามารถแนะนำช่างได้</div>
-      <div class="recommendation-name">${data.message}</div>
-      <div class="small text-muted">กรุณาตรวจสอบทักษะที่กำหนดให้เครื่องมือ หรือเลือกวันอื่น</div></div>
-    </div>`;
-    recommendationEl.classList.remove('d-none');
-  } else {
-    recommendationEl.classList.remove('no-match');
-    recommendationEl.classList.add('d-none');
-  }
-
-  const currentTechId = document.getElementById('id_technician').value;
-
-  listEl.innerHTML = data.technicians.map(t => {
-    const statusText = t.on_leave ? 'ลา' : (!t.is_work_day ? 'ไม่มีเวรวันนี้' : 'ว่าง');
-    const statusBadge = t.available
-      ? `<span class="badge bg-success">${statusText}</span>`
-      : `<span class="badge bg-danger">${statusText}</span>`;
-    const skillBadge = t.skill_match
-      ? '<span class="badge bg-info text-dark">ทักษะตรง</span>'
-      : '<span class="badge bg-secondary">ทักษะไม่ตรง</span>';
-    const capacityBadge = t.available
-      ? (t.capacity_remaining > 0
-          ? `<span class="badge bg-primary capacity-badge">รับได้อีก ${t.capacity_remaining} เครื่อง</span>`
-          : `<span class="badge bg-warning text-dark capacity-badge">งานเต็มแล้ว</span>`)
-      : '';
-    const selectedCls = String(t.id) === currentTechId ? 'selected' : '';
-    const unavailCls = !t.available ? 'unavailable' : '';
-    return `
-      <div class="col-md-6 col-lg-4">
-        <div class="tech-suggest-card ${selectedCls} ${unavailCls}" data-id="${t.id}">
-          <div class="d-flex justify-content-between align-items-center">
-            <span class="fw-500">${t.name}</span>
-            <span class="badge" style="background:${t.color}">&nbsp;</span>
-          </div>
-          <div class="mt-1 d-flex gap-1 flex-wrap">
-            ${statusBadge} ${skillBadge} ${capacityBadge}
-          </div>
-          <div class="small text-muted mt-1">งานวันนี้: ${t.job_count_today} งาน (${t.busy_minutes} นาที)</div>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-document.getElementById('tech-suggest-list').addEventListener('click', function (e) {
-  const card = e.target.closest('.tech-suggest-card');
-  if (!card) return;
-  const techSelect = document.getElementById('id_technician');
-  techSelect.value = card.dataset.id;
-  techSelect.dispatchEvent(new Event('change'));
-  document.querySelectorAll('.tech-suggest-card').forEach(c => c.classList.remove('selected'));
-  card.classList.add('selected');
-});
-
-// ── Date-picker calendar with availability colouring ──
-let calendarAvailability = {};
-
-async function loadCalendarAvailability(fpInstance) {
-  if (!fpInstance) return;
-  const eqId = eqSelect.value;
-  const techId = document.getElementById('id_technician').value;
-  const params = new URLSearchParams({
-    year: fpInstance.currentYear,
-    month: fpInstance.currentMonth + 1,
-    service_type: selectedServiceType(),
-  });
-  if (eqId) params.set('equipment_id', eqId);
-  if (techId) params.set('technician_id', techId);
-
-  const res = await fetch(`/api/calendar-availability/?${params.toString()}`);
-  const data = await res.json();
-  calendarAvailability = {};
-  (data.days || []).forEach(d => { calendarAvailability[d.date] = d; });
-  renderDateRecommendations(data.days || []);
-  fpInstance.redraw();
-}
-
-function renderDateRecommendations(days) {
-  const container = document.getElementById('date-recommendations');
-  const today = new Date().toISOString().slice(0, 10);
-  const availableDays = days
-    .filter(day => day.date >= today && ['available', 'limited'].includes(day.status))
-    .sort((a, b) => b.capacity - a.capacity || a.date.localeCompare(b.date))
-    .slice(0, 3);
-  if (!eqSelect.value || !availableDays.length) {
-    container.classList.add('d-none');
-    return;
-  }
-  container.innerHTML = `<div class="small fw-600 text-warning-emphasis mb-1"><i class="bi bi-stars me-1"></i>วันที่แนะนำที่ยังมีคิวว่าง</div>
-    <div class="d-flex flex-wrap gap-1">${availableDays.map(day =>
-      `<button type="button" class="btn date-recommendation" data-date="${day.date}">
-        ${formatRecommendationDate(day.date)} · เหลือ ${day.capacity} คิว
-      </button>`).join('')}</div>`;
-  container.classList.remove('d-none');
-}
-
-function formatRecommendationDate(dateStr) {
-  return new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
-    .format(new Date(`${dateStr}T00:00:00`));
-}
-
-document.getElementById('date-recommendations').addEventListener('click', function (e) {
-  const button = e.target.closest('[data-date]');
-  if (!button) return;
-  datePicker.setDate(button.dataset.date, true);
-});
-
-const datePicker = flatpickr('#id_scheduled_date', {
-  locale: 'th',
-  dateFormat: 'Y-m-d',
-  altInput: true,
-  altFormat: 'j F Y',
-  allowInput: true,
-  minDate: 'today',
-  onDayCreate: function (dObj, dStr, fpInstance, dayElem) {
-    const iso = fpInstance.formatDate(dayElem.dateObj, 'Y-m-d');
-    const info = calendarAvailability[iso];
-    if (!info) return;
-    dayElem.classList.add(`day-${info.status}`);
-    const labels = {
-      available: `ว่างมาก (รับได้อีก ${info.capacity} เครื่อง)`,
-      limited: `เหลือน้อย (รับได้อีก ${info.capacity} เครื่อง)`,
-      full: 'เต็มแล้ว ไม่ว่างรับงานเพิ่ม',
-      closed: 'ไม่มีเวรช่างวันนี้ (วันหยุด/ลาทั้งหมด)',
-    };
-    dayElem.title = labels[info.status] || '';
-  },
-  onChange: function () {
-    onDateOrTechChange();
-    fetchTechSuggestions();
-  },
-  onMonthChange: function (selectedDates, dateStr, fpInstance) {
-    loadCalendarAvailability(fpInstance);
-  },
-  onOpen: function (selectedDates, dateStr, fpInstance) {
-    loadCalendarAvailability(fpInstance);
-  },
-});
-
-// ── Date / Technician change ──
-async function onDateOrTechChange() {
-  const techId  = document.getElementById('id_technician').value;
-  const dateStr = document.getElementById('id_scheduled_date').value;
-  const infoEl  = document.getElementById('availability-info');
-
-  updateTimeTypeBadge();
-
-  if (!techId || !dateStr) { infoEl.innerHTML = ''; return; }
-
-  const data = await fetchAvailability(techId, dateStr);
-  if (!data) { infoEl.innerHTML = ''; return; }
-
-  const dot = data.available
-    ? '<span class="availability-indicator bg-success me-1"></span>'
-    : '<span class="availability-indicator bg-danger me-1"></span>';
-
-  let html = `<div class="d-flex align-items-center gap-2 flex-wrap">
-    ${dot}
-    <span class="fw-500">${data.technician_name}</span>
-    <span class="badge ${data.available ? 'bg-success' : 'bg-danger'}">${data.available ? 'ว่างในวันนี้' : 'ไม่อยู่'}</span>`;
-
-  if (data.busy_slots && data.busy_slots.length > 0) {
-    html += `<span class="text-muted small">| นัดที่มีอยู่แล้ว:</span>`;
-    data.busy_slots.forEach(s => {
-      html += `<span class="busy-slot">${s.start_time}–${s.end_time} (${s.appointment_no})</span>`;
-    });
-  }
-  html += '</div>';
-  infoEl.innerHTML = html;
-}
-
-document.getElementById('id_technician').addEventListener('change', function () {
-  onDateOrTechChange();
-  loadCalendarAvailability(datePicker);
-});
-document.getElementById('id_scheduled_date').addEventListener('change', function () {
-  onDateOrTechChange();
-  fetchTechSuggestions();
-});
-document.getElementById('id_start_time').addEventListener('change', function () {
-  updateEndTime();
-  updateTimeTypeBadge();
-});
-document.getElementById('id_duration_minutes').addEventListener('input', updateEndTime);
-
-// ── Quick time buttons ──
-document.querySelectorAll('.quick-time').forEach(btn => {
-  btn.addEventListener('click', function () {
-    document.getElementById('id_start_time').value = this.dataset.time;
-    updateEndTime();
-    updateTimeTypeBadge();
-    updateSummary();
-  });
-});
-
-// ── Summary sidebar updater ──
-function updateSummary() {
-  // Equipment
-  const eqOpt = eqSelect.options[eqSelect.selectedIndex];
-  document.getElementById('sum-equipment').textContent =
-    eqSelect.value ? eqOpt.text.split(' –')[0] : '–';
-  // Service type
-  const stEl = document.getElementById('id_service_type');
-  document.getElementById('sum-service-type').textContent =
-    stEl.value ? stEl.options[stEl.selectedIndex].text : '–';
-  // Date
-  const dateEl = document.getElementById('id_scheduled_date');
-  document.getElementById('sum-date').textContent = dateEl.value || '–';
-  // Technician
-  const techEl = document.getElementById('id_technician');
-  document.getElementById('sum-technician').textContent =
-    techEl.value ? techEl.options[techEl.selectedIndex].text : '–';
-  // Time
-  const start = document.getElementById('id_start_time').value;
-  const end   = document.getElementById('id_end_time').value;
-  const dur   = document.getElementById('id_duration_minutes').value;
-  document.getElementById('sum-time').textContent =
-    start ? `${start}–${end} (${dur} นาที)` : '–';
-  // Coordinator
-  const coord = document.getElementById('id_coordinator_name').value;
-  document.getElementById('sum-coordinator').textContent = coord || '–';
-}
-
-// ── LocalStorage: remember coordinator ──
-const coordEl = document.getElementById('id_coordinator_name');
-const LS_KEY  = 'cmms_coordinator';
-coordEl.addEventListener('input', function () {
-  if (this.value.trim()) localStorage.setItem(LS_KEY, this.value.trim());
-  updateSummary();
-});
-
-// ── Ctrl+Enter shortcut ──
-document.addEventListener('keydown', function (e) {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-    e.preventDefault();
-    document.getElementById('btn-submit').click();
-  }
-});
-
-// Hook updateSummary to existing change events
-document.getElementById('id_service_type').addEventListener('change', updateSummary);
-document.getElementById('id_service_type').addEventListener('change', function () {
-  fetchTechSuggestions();
-  loadCalendarAvailability(datePicker);
-});
-document.getElementById('id_technician').addEventListener('change', updateSummary);
-document.getElementById('id_scheduled_date').addEventListener('change', updateSummary);
-document.getElementById('id_start_time').addEventListener('change', updateSummary);
-document.getElementById('id_duration_minutes').addEventListener('input', updateSummary);
-
-// ── Init on load ──
-window.addEventListener('DOMContentLoaded', function () {
-  updateTimeTypeBadge();
-  // Restore coordinator from localStorage
-  const savedCoord = localStorage.getItem(LS_KEY);
-  if (savedCoord && !coordEl.value) coordEl.value = savedCoord;
-
-  const eq      = eqSelect.value;
-  const techEl  = document.getElementById('id_technician');
-  const dateVal = document.getElementById('id_scheduled_date').value;
-
-  // Equipment pre-fill
-  if (eq) {
-    const selectedOption = eqSelect.options[eqSelect.selectedIndex];
-    if (selectedOption) eqSearchInput.value = selectedOption.text;
-    fetchEquipmentInfo(eq).then(data => {
-      document.getElementById('equipment-info').innerHTML =
-        `${data.customer} – ${data.department || ''} | PM: ${data.maintenance_duration} นาที`;
-    });
-    fetchTechSuggestions();
-  }
-
-  // Date pre-fill: sync flatpickr (dispatch board or edit form)
-  if (dateVal) {
-    datePicker.setDate(dateVal, false);
-  }
-
-  // Tech + Date both pre-filled (dispatch board): show availability slots immediately
-  if (techEl.value && dateVal) {
-    onDateOrTechChange();
-  }
-
-  loadCalendarAvailability(datePicker);
-  updateSummary();
-});
-</script>
+<script src="{% static 'appointments/js/appointment_form.js' %}"></script>
 {% endblock %}

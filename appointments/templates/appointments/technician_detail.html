@@ -186,7 +186,8 @@
       <div class="card-header d-flex align-items-center justify-content-between">
         <span><i class="bi bi-moon-stars text-warning me-2"></i>ลงทะเบียนนอกเวลา</span>
         <button class="btn btn-outline-warning btn-sm py-0" type="button"
-                data-bs-toggle="collapse" data-bs-target="#collapseAddOT">
+                data-bs-toggle="collapse" data-bs-target="#collapseAddOT"
+                aria-controls="collapseAddOT" aria-label="เพิ่มวันนอกเวลา" title="เพิ่มวันนอกเวลา">
           <i class="bi bi-plus"></i>
         </button>
       </div>
@@ -215,10 +216,10 @@
           </span>
           <span class="fw-500 flex-grow-1">{{ ot.date|date:"D d/m/Y" }}</span>
           <span class="text-muted" style="font-size:.7rem">{{ ot.start_time_str }}–{{ ot.end_time_str }}</span>
-          <form method="post" action="{% url 'appointments:technician_remove_overtime' technician.pk ot.pk %}">
+          <form method="post" action="{% url 'appointments:technician_remove_overtime' technician.pk ot.pk %}"
+                data-confirm="ลบวันนอกเวลานี้?">
             {% csrf_token %}
-            <button type="submit" class="btn btn-link btn-sm text-danger p-0"
-                    onclick="return confirm('ลบวันนอกเวลานี้?')">
+            <button type="submit" class="btn btn-link btn-sm text-danger p-0" title="ลบวันนอกเวลา" aria-label="ลบวันนอกเวลา">
               <i class="bi bi-x-circle"></i>
             </button>
           </form>

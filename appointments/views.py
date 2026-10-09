@@ -9,7 +9,9 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
 from django.contrib import messages
-from django.db.models import Count, Q, Sum
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.db.models import Count, Prefetch, Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
@@ -29,6 +31,19 @@ from .utils import (
     STATUS_COLORS, SERVICE_TYPE_COLORS,
     OFFICE_HOURS_START, OFFICE_HOURS_END,
 )
+
+
+def _valid_date(value):
+    """Return the YYYY-MM-DD part of value if it is a real date, else None."""
+    try:
+        return date.fromisoformat(str(value)[:10]).isoformat()
+    except ValueError:
+        return None
+
+
+def _valid_int(value):
+    """Return value if it is a plain non-negative integer string, else None."""
+    return value if value and str(value).isdigit() else None
 
 
 # ─────────────────────────── Dashboard ───────────────────────────
@@ -75,16 +90,20 @@ def dashboard(request):
     )
 
     technician_stats = []
-    for tech in Technician.objects.filter(is_active=True).prefetch_related('work_days'):
-        week_count = Appointment.objects.filter(
-            technician=tech,
-            scheduled_date__gte=today,
-            scheduled_date__lte=week_end,
-            status__in=['scheduled', 'confirmed'],
-        ).count()
+    # One aggregate query for every technician's weekly workload instead of one per technician
+    week_counts = dict(
+        Appointment.objects
+        .filter(scheduled_date__gte=today, scheduled_date__lte=week_end,
+                status__in=['scheduled', 'confirmed'])
+        .values_list('technician_id')
+        .annotate(total=Count('pk'))
+    )
+    for tech in (Technician.objects.filter(is_active=True)
+                 .prefetch_related('work_days',
+                                   Prefetch('leaves', queryset=TechnicianLeave.objects.filter(leave_date=today)))):
         technician_stats.append({
             'technician': tech,
-            'week_count': week_count,
+            'week_count': week_counts.get(tech.pk, 0),
             'available_today': tech.is_available_on(today),
         })
 
@@ -213,8 +232,8 @@ def _build_ot_section(selected_date, day_apts, by_tech):
 
     ot_rows = []
     for tech in (Technician.objects.filter(is_active=True, pk__in=ot_ids)
-                 .prefetch_related('leaves')):
-        on_leave = tech.leaves.filter(leave_date=selected_date).exists()
+                 .prefetch_related(Prefetch('leaves', queryset=TechnicianLeave.objects.filter(leave_date=selected_date)))):
+        on_leave = tech.has_leave_on(selected_date)
         raw = list(by_tech.get(tech.pk, []))
         apts = [a for a in raw
                 if not is_weekday or (a.start_time.hour * 60 + a.start_time.minute) >= OT_START]
@@ -278,9 +297,10 @@ def dispatch_board(request):
 
     rows = []
     for tech in (Technician.objects.filter(is_active=True)
-                 .prefetch_related('work_days', 'leaves', 'skills')):
-        is_work_day = tech.work_days.filter(day_of_week=selected_date.weekday()).exists()
-        on_leave    = tech.leaves.filter(leave_date=selected_date).exists()
+                 .prefetch_related('work_days', 'skills',
+                                   Prefetch('leaves', queryset=TechnicianLeave.objects.filter(leave_date=selected_date)))):
+        is_work_day = tech.works_on_weekday(selected_date.weekday())
+        on_leave    = tech.has_leave_on(selected_date)
         available   = is_work_day and not on_leave
 
         apts     = by_tech.get(tech.pk, [])
@@ -359,14 +379,25 @@ def api_appointments(request):
     ).select_related('equipment', 'technician', 'equipment__customer')
 
     if start_str:
-        qs = qs.filter(scheduled_date__gte=start_str[:10])
+        start_date = _valid_date(start_str)
+        if not start_date:
+            return JsonResponse({'error': 'Invalid start date'}, status=400)
+        qs = qs.filter(scheduled_date__gte=start_date)
     if end_str:
-        qs = qs.filter(scheduled_date__lte=end_str[:10])
+        end_date = _valid_date(end_str)
+        if not end_date:
+            return JsonResponse({'error': 'Invalid end date'}, status=400)
+        qs = qs.filter(scheduled_date__lte=end_date)
     if technician_id and technician_id != 'all':
+        if not _valid_int(technician_id):
+            return JsonResponse({'error': 'Invalid technician'}, status=400)
         qs = qs.filter(technician_id=technician_id)
+    if request.GET.get('include_overtime', '1') == '0':
+        qs = qs.filter(time_type='office')
 
     events = []
     for apt in qs:
+        is_overtime = apt.time_type != 'office'
         color = apt.technician.color
         if apt.status == 'completed':
             color = '#27ae60'
@@ -382,7 +413,7 @@ def api_appointments(request):
             'start': start_iso,
             'end': end_iso,
             'color': color,
-            'borderColor': '#333' if apt.time_type == 'overtime' else color,
+            'borderColor': '#333' if is_overtime else color,
             'extendedProps': {
                 'appointment_no': apt.appointment_no,
                 'technician': apt.technician.full_name,
@@ -395,7 +426,7 @@ def api_appointments(request):
                 'status': apt.get_status_display(),
                 'duration': apt.duration_minutes,
                 'notes': apt.notes,
-                'is_overtime': apt.time_type == 'overtime',
+                'is_overtime': is_overtime,
                 'detail_url': f'/appointments/{apt.pk}/',
             },
         })
@@ -449,7 +480,7 @@ def api_skill_search(request):
     q = request.GET.get('q', '').strip()
     qs = Skill.objects.all()
     if q:
-        qs = qs.filter(Q(name__icontains=q) | Q(name_th__icontains=q))
+        qs = qs.filter(name__icontains=q)
     qs = qs.order_by('name')[:20]
     results = [{'id': s.pk, 'name': s.name} for s in qs]
     return JsonResponse({'results': results})
@@ -483,22 +514,28 @@ def api_technician_suggestions(request):
     )
 
     active_statuses = ['scheduled', 'confirmed', 'in_progress']
+    # Workload of every technician on that date in one query
+    busy_by_tech = defaultdict(lambda: [0, 0])  # technician_id -> [minutes, job_count]
+    for tech_id, minutes in (Appointment.objects
+                             .filter(scheduled_date=check_date, status__in=active_statuses)
+                             .values_list('technician_id', 'duration_minutes')):
+        busy_by_tech[tech_id][0] += minutes
+        busy_by_tech[tech_id][1] += 1
+
     results = []
     technicians = (
         Technician.objects.filter(is_active=True)
-        .prefetch_related('skills', 'work_days', 'leaves')
+        .prefetch_related('skills', 'work_days',
+                          Prefetch('leaves', queryset=TechnicianLeave.objects.filter(leave_date=check_date)))
     )
     for tech in technicians:
-        tech_skill_ids = set(tech.skills.values_list('pk', flat=True))
+        tech_skill_ids = {s.pk for s in tech.skills.all()}
         skill_match = required_skill_ids.issubset(tech_skill_ids)
-        is_work_day = tech.work_days.filter(day_of_week=check_date.weekday()).exists()
-        on_leave = tech.leaves.filter(leave_date=check_date).exists()
+        is_work_day = tech.works_on_weekday(check_date.weekday())
+        on_leave = tech.has_leave_on(check_date)
         available = is_work_day and not on_leave
 
-        day_appointments = Appointment.objects.filter(
-            technician=tech, scheduled_date=check_date, status__in=active_statuses)
-        busy_minutes = day_appointments.aggregate(total=Sum('duration_minutes'))['total'] or 0
-        job_count = day_appointments.count()
+        busy_minutes, job_count = busy_by_tech.get(tech.pk, (0, 0))
 
         remaining_minutes = max(0, office_minutes - busy_minutes)
         capacity_remaining = remaining_minutes // duration
@@ -572,7 +609,7 @@ def api_calendar_availability(request):
         return JsonResponse({'error': 'Invalid parameters'}, status=400)
 
     equipment_id = request.GET.get('equipment_id')
-    technician_id = request.GET.get('technician_id')
+    technician_id = _valid_int(request.GET.get('technician_id'))
 
     duration = 120
     required_skill_ids = set()
@@ -588,9 +625,12 @@ def api_calendar_availability(request):
         except Equipment.DoesNotExist:
             pass
 
+    # Only this month's leaves are needed, not the whole history
     technicians_qs = (
         Technician.objects.filter(is_active=True)
-        .prefetch_related('skills', 'work_days', 'leaves')
+        .prefetch_related('skills', 'work_days',
+                          Prefetch('leaves', queryset=TechnicianLeave.objects.filter(
+                              leave_date__year=year, leave_date__month=month)))
     )
     if technician_id:
         technicians_qs = technicians_qs.filter(pk=technician_id)
@@ -598,7 +638,7 @@ def api_calendar_availability(request):
     if required_skill_ids and not technician_id:
         technicians = [
             t for t in technicians
-            if required_skill_ids.issubset(set(t.skills.values_list('pk', flat=True)))
+            if required_skill_ids.issubset({s.pk for s in t.skills.all()})
         ]
 
     # Build in-memory lookups (uses the prefetch cache, avoids per-day queries).
@@ -700,12 +740,13 @@ def appointment_list(request):
         'equipment', 'technician', 'equipment__customer'
     ).order_by('-scheduled_date', 'start_time')
 
-    technician_id  = request.GET.get('technician')
-    customer_id    = request.GET.get('customer')
+    # Ignore malformed filter values (e.g. from a hand-edited URL) instead of failing
+    technician_id  = _valid_int(request.GET.get('technician'))
+    customer_id    = _valid_int(request.GET.get('customer'))
     status_filter  = request.GET.get('status')
     service_type   = request.GET.get('service_type')
-    date_from      = request.GET.get('date_from')
-    date_to        = request.GET.get('date_to')
+    date_from      = _valid_date(request.GET.get('date_from'))
+    date_to        = _valid_date(request.GET.get('date_to'))
     time_type      = request.GET.get('time_type')
     search         = request.GET.get('search', '')
 
@@ -733,6 +774,63 @@ def appointment_list(request):
         )
 
     total_count = qs.count()
+
+    # Sorting (whitelisted); the default keeps the original newest-first order
+    sort_fields = {
+        'date':       ('scheduled_date', 'start_time'),
+        'no':         ('appointment_no',),
+        'technician': ('technician__first_name', 'technician__last_name'),
+        'equipment':  ('equipment__name',),
+        'customer':   ('equipment__customer__name',),
+        'service':    ('service_type',),
+        'status':     ('status',),
+    }
+    sort_key = request.GET.get('sort')
+    sort_dir = 'asc' if request.GET.get('dir') == 'asc' else 'desc'
+    if sort_key in sort_fields:
+        prefix = '' if sort_dir == 'asc' else '-'
+        qs = qs.order_by(*[prefix + f for f in sort_fields[sort_key]], 'pk')
+    else:
+        sort_key, sort_dir = None, None
+    sort_labels = [
+        ('no', 'เลขที่'), ('date', 'วันที่ / เวลา'), ('technician', 'ช่าง'),
+        ('equipment', 'เครื่องมือ'), ('customer', 'โรงพยาบาล'), ('service', 'ประเภท'),
+        ('status', 'สถานะ'),
+    ]
+    sort_headers = [{
+        'key': key,
+        'label': label,
+        'active': key == sort_key,
+        'dir': sort_dir if key == sort_key else None,
+        'next_dir': 'desc' if (key == sort_key and sort_dir == 'asc') else 'asc',
+    } for key, label in sort_labels]
+
+    # Active filter chips, each with a URL that removes just that filter
+    def lookup(model, pk, attr):
+        try:
+            return str(getattr(model.objects.get(pk=pk), attr))
+        except (model.DoesNotExist, ValueError):
+            return pk
+
+    chips = []
+    chip_sources = [
+        ('date_from', 'ตั้งแต่', date_from),
+        ('date_to', 'ถึง', date_to),
+        ('customer', 'ลูกค้า', customer_id and lookup(Customer, customer_id, 'name')),
+        ('technician', 'ช่าง', technician_id and lookup(Technician, technician_id, 'full_name')),
+        ('service_type', 'ประเภท', dict(Appointment.SERVICE_TYPE_CHOICES).get(service_type, service_type)),
+        ('status', 'สถานะ', dict(Appointment.STATUS_CHOICES).get(status_filter, status_filter)),
+        ('time_type', 'ช่วงเวลา', dict(Appointment.TIME_TYPE_CHOICES).get(time_type, time_type)),
+        ('search', 'ค้นหา', search),
+    ]
+    for key, label, value in chip_sources:
+        if not value:
+            continue
+        params = request.GET.copy()
+        params.pop(key, None)
+        params.pop('page', None)
+        chips.append({'label': label, 'value': value, 'remove_url': '?' + params.urlencode()})
+
     paginator   = Paginator(qs, 50)
     page_obj    = paginator.get_page(request.GET.get('page', 1))
 
@@ -740,6 +838,8 @@ def appointment_list(request):
         'appointments':         page_obj,
         'page_obj':             page_obj,
         'total_count':          total_count,
+        'sort_headers':         sort_headers,
+        'filter_chips':         chips,
         'technicians':          Technician.objects.filter(is_active=True),
         'customers':            Customer.objects.all().order_by('name'),
         'status_choices':       Appointment.STATUS_CHOICES,
@@ -866,6 +966,10 @@ def appointment_detail(request, pk):
 @require_POST
 def appointment_receive(request, pk):
     apt = get_object_or_404(Appointment, pk=pk)
+    if not apt.is_open:
+        messages.error(
+            request, f'ไม่สามารถอัพเดทการรับเครื่องได้ นัดหมายนี้อยู่ในสถานะ "{apt.get_status_display()}"')
+        return redirect('appointments:appointment_detail', pk=pk)
     apt.equipment_received = not apt.equipment_received
     if apt.equipment_received:
         apt.equipment_received_at = timezone.now()
@@ -881,13 +985,20 @@ def appointment_receive(request, pk):
 @require_POST
 def appointment_assign(request, pk):
     apt = get_object_or_404(Appointment, pk=pk)
-    tech_id = request.POST.get('assigned_to')
-    if tech_id:
-        apt.assigned_to_id = int(tech_id)
-        if apt.status in ('scheduled', 'confirmed'):
-            apt.status = 'in_progress'
-        apt.save()
-        messages.success(request, 'มอบหมายงานเรียบร้อยแล้ว')
+    if not apt.is_open:
+        messages.error(
+            request, f'ไม่สามารถมอบหมายงานได้ นัดหมายนี้อยู่ในสถานะ "{apt.get_status_display()}"')
+        return redirect('appointments:appointment_detail', pk=pk)
+    tech_id = _valid_int(request.POST.get('assigned_to'))
+    tech = Technician.objects.filter(pk=tech_id, is_active=True).first() if tech_id else None
+    if not tech:
+        messages.error(request, 'กรุณาเลือกช่างที่ปฏิบัติงานอยู่')
+        return redirect('appointments:appointment_detail', pk=pk)
+    apt.assigned_to = tech
+    if apt.status in ('scheduled', 'confirmed'):
+        apt.status = 'in_progress'
+    apt.save()
+    messages.success(request, 'มอบหมายงานเรียบร้อยแล้ว')
     return redirect('appointments:appointment_detail', pk=pk)
 
 
@@ -901,7 +1012,11 @@ def appointment_complete_action(request, pk):
         completion_date = _dt.strptime(date_str, '%Y-%m-%d').date()
     except (ValueError, TypeError):
         completion_date = date.today()
-    apt.mark_completed(completion_date, notes)
+    try:
+        apt.mark_completed(completion_date, notes)
+    except ValidationError as exc:
+        messages.error(request, exc.messages[0])
+        return redirect('appointments:appointment_detail', pk=pk)
     equip = apt.equipment
     next_parts = []
     if equip.next_maintenance_date:
@@ -1085,6 +1200,18 @@ def equipment_detail(request, pk):
     return render(request, 'appointments/equipment_detail.html', context)
 
 
+def _skill_by_name(name, prefer=None):
+    """Resolve a Skill by name. Skill names are not unique (they can differ by
+    skill_type), so prefer a skill already linked to the equipment and otherwise
+    pick the lowest pk for a stable result."""
+    matches = Skill.objects.filter(name=name).order_by('pk')
+    if prefer is not None:
+        linked = matches.filter(pk__in=[s.pk for s in prefer]).first()
+        if linked:
+            return linked
+    return matches.first()
+
+
 def equipment_create(request):
     if request.method == 'POST':
         form = EquipmentForm(request.POST)
@@ -1100,10 +1227,7 @@ def equipment_create(request):
                 # fall back: check name matches a skill
                 posted_name = request.POST.get('name', '').strip()
                 if posted_name:
-                    try:
-                        selected_skill = Skill.objects.get(name=posted_name)
-                    except Skill.DoesNotExist:
-                        selected_skill = None
+                    selected_skill = _skill_by_name(posted_name)
 
             if not selected_skill:
                 form.add_error('name', 'ชื่อเครื่องต้องเลือกจากรายการทักษะ (โปรดเลือกหนึ่งรายการ)')
@@ -1135,10 +1259,7 @@ def equipment_update(request, pk):
             else:
                 posted_name = request.POST.get('name', '').strip()
                 if posted_name:
-                    try:
-                        selected_skill = Skill.objects.get(name=posted_name)
-                    except Skill.DoesNotExist:
-                        selected_skill = None
+                    selected_skill = _skill_by_name(posted_name, prefer=equipment.repair_required_skills.all())
 
             if not selected_skill:
                 form.add_error('name', 'ชื่อเครื่องต้องเลือกจากรายการทักษะ (โปรดเลือกหนึ่งรายการ)')
@@ -1250,6 +1371,10 @@ def equipment_import_template(request):
     return response
 
 
+IMPORT_MAX_BYTES = 5 * 1024 * 1024
+IMPORT_MAX_ROWS = 5000
+
+
 def equipment_import(request):
     if request.method != 'POST':
         return render(request, 'appointments/equipment_import.html')
@@ -1257,6 +1382,12 @@ def equipment_import(request):
     excel_file = request.FILES.get('excel_file')
     if not excel_file:
         messages.error(request, 'กรุณาเลือกไฟล์ Excel')
+        return render(request, 'appointments/equipment_import.html')
+    if not excel_file.name.lower().endswith('.xlsx'):
+        messages.error(request, 'รองรับเฉพาะไฟล์ .xlsx')
+        return render(request, 'appointments/equipment_import.html')
+    if excel_file.size > IMPORT_MAX_BYTES:
+        messages.error(request, f'ไฟล์ใหญ่เกินไป (สูงสุด {IMPORT_MAX_BYTES // (1024 * 1024)} MB)')
         return render(request, 'appointments/equipment_import.html')
 
     try:
@@ -1266,6 +1397,9 @@ def equipment_import(request):
         return render(request, 'appointments/equipment_import.html')
 
     ws = wb.active
+    if ws.max_row - 1 > IMPORT_MAX_ROWS:
+        messages.error(request, f'จำนวนแถวมากเกินไป (สูงสุด {IMPORT_MAX_ROWS} แถวต่อไฟล์)')
+        return render(request, 'appointments/equipment_import.html')
     headers = [str(c.value).strip() if c.value is not None else '' for c in ws[1]]
     field_map = {label.rstrip(' *'): field for field, label in _IMPORT_COLUMNS}
     col_index = {}  # field_name -> 0-based column index
@@ -1290,18 +1424,25 @@ def equipment_import(request):
     def to_str(v, default=''):
         return str(v).strip() if v is not None else default
 
-    def to_int(v, default=None):
-        try:
-            return int(v) if v is not None and str(v).strip() != '' else default
-        except (ValueError, TypeError):
-            return default
-
     def to_bool(v, default=False):
         if v is None:
             return default
         if isinstance(v, bool):
             return v
         return str(v).strip() in ('1', 'true', 'True', 'yes', 'Yes', 'ใช่')
+
+    def to_positive_int(v, label, errors):
+        """None when blank; records an error unless the value is a whole number >= 1."""
+        if v is None or str(v).strip() == '':
+            return None
+        try:
+            number = float(str(v).strip())
+        except ValueError:
+            number = 0
+        if number < 1 or number != int(number):
+            errors.append(f'{label} ต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป')
+            return None
+        return int(number)
 
     def to_date(v):
         if v is None or str(v).strip() == '':
@@ -1316,66 +1457,79 @@ def equipment_import(request):
     created = updated = skipped = 0
     row_errors = []
 
-    for row_num, row in enumerate(ws.iter_rows(min_row=2), start=2):
-        # skip fully-empty rows
-        if all(c.value is None for c in row):
-            continue
+    # Columns where a blank cell means "not provided" (never overwrite existing data with blanks)
+    text_fields = ['equipment_code', 'asset_number', 'name_th', 'model', 'manufacturer',
+                   'owner_unit_name', 'user_unit_name', 'department']
+    date_fields = ['last_maintenance_date', 'next_maintenance_date',
+                   'last_calibration_date', 'next_calibration_date']
+    int_fields = [
+        ('maintenance_duration_minutes', 'เวลา PM'), ('maintenance_interval_months', 'รอบ PM'),
+        ('calibration_duration_minutes', 'เวลาสอบเทียบ'), ('calibration_interval_months', 'รอบสอบเทียบ'),
+    ]
+    bool_fields = ['requires_calibration', 'is_active']
 
-        serial = to_str(cell_val(row, 'serial_number'))
-        name   = to_str(cell_val(row, 'name'))
-        cust_code = to_str(cell_val(row, 'customer_code'))
+    # Everything is imported in one transaction: an unexpected failure leaves the data untouched.
+    # Rows with validation problems are skipped and reported.
+    try:
+        with transaction.atomic():
+            for row_num, row in enumerate(ws.iter_rows(min_row=2), start=2):
+                # skip fully-empty rows
+                if all(c.value is None for c in row):
+                    continue
 
-        errors = []
-        if not serial:
-            errors.append('ไม่มี SerialNo')
-        if not name:
-            errors.append('ไม่มีชื่อเครื่อง')
-        if not cust_code:
-            errors.append('ไม่มีรหัสลูกค้า')
+                serial = to_str(cell_val(row, 'serial_number'))
+                name   = to_str(cell_val(row, 'name'))
+                cust_code = to_str(cell_val(row, 'customer_code'))
 
-        if errors:
-            row_errors.append({'row': row_num, 'serial': serial or '-', 'errors': errors})
-            skipped += 1
-            continue
+                errors = []
+                if not serial:
+                    errors.append('ไม่มี SerialNo')
+                if not name:
+                    errors.append('ไม่มีชื่อเครื่อง')
+                if not cust_code:
+                    errors.append('ไม่มีรหัสลูกค้า')
 
-        try:
-            customer = Customer.objects.get(code=cust_code)
-        except Customer.DoesNotExist:
-            row_errors.append({'row': row_num, 'serial': serial, 'errors': [f'ไม่พบลูกค้ารหัส "{cust_code}"']})
-            skipped += 1
-            continue
+                values = {}
+                for field in text_fields:
+                    text = to_str(cell_val(row, field))
+                    if text:
+                        values[field] = text
+                for field in date_fields:
+                    parsed = to_date(cell_val(row, field))
+                    if parsed:
+                        values[field] = parsed
+                for field, label in int_fields:
+                    number = to_positive_int(cell_val(row, field), label, errors)
+                    if number is not None:
+                        values[field] = number
+                for field in bool_fields:
+                    if cell_val(row, field) is not None:
+                        values[field] = to_bool(cell_val(row, field))
 
-        defaults = dict(
-            name=name,
-            equipment_code=to_str(cell_val(row, 'equipment_code')),
-            asset_number=to_str(cell_val(row, 'asset_number')),
-            name_th=to_str(cell_val(row, 'name_th')),
-            model=to_str(cell_val(row, 'model')),
-            manufacturer=to_str(cell_val(row, 'manufacturer')),
-            customer=customer,
-            owner_unit_name=to_str(cell_val(row, 'owner_unit_name')),
-            user_unit_name=to_str(cell_val(row, 'user_unit_name')),
-            department=to_str(cell_val(row, 'department')),
-            maintenance_duration_minutes=to_int(cell_val(row, 'maintenance_duration_minutes'), 120),
-            maintenance_interval_months=to_int(cell_val(row, 'maintenance_interval_months'), 12),
-            last_maintenance_date=to_date(cell_val(row, 'last_maintenance_date')),
-            next_maintenance_date=to_date(cell_val(row, 'next_maintenance_date')),
-            requires_calibration=to_bool(cell_val(row, 'requires_calibration')),
-            calibration_duration_minutes=to_int(cell_val(row, 'calibration_duration_minutes')),
-            calibration_interval_months=to_int(cell_val(row, 'calibration_interval_months')),
-            last_calibration_date=to_date(cell_val(row, 'last_calibration_date')),
-            next_calibration_date=to_date(cell_val(row, 'next_calibration_date')),
-            is_active=to_bool(cell_val(row, 'is_active'), default=True),
-        )
+                customer = None
+                if cust_code:
+                    customer = Customer.objects.filter(code=cust_code).first()
+                    if not customer:
+                        errors.append(f'ไม่พบลูกค้ารหัส "{cust_code}"')
 
-        obj, was_created = Equipment.objects.update_or_create(
-            serial_number=serial,
-            defaults=defaults,
-        )
-        if was_created:
-            created += 1
-        else:
-            updated += 1
+                if errors:
+                    row_errors.append({'row': row_num, 'serial': serial or '-', 'errors': errors})
+                    skipped += 1
+                    continue
+
+                values.update(name=name, customer=customer)
+                equipment = Equipment.objects.filter(serial_number=serial).first()
+                if equipment:
+                    for field, value in values.items():
+                        setattr(equipment, field, value)
+                    equipment.save()
+                    updated += 1
+                else:
+                    Equipment.objects.create(serial_number=serial, **values)
+                    created += 1
+    except Exception:
+        messages.error(request, 'นำเข้าข้อมูลไม่สำเร็จ ไม่มีข้อมูลถูกเปลี่ยนแปลง กรุณาตรวจสอบไฟล์แล้วลองใหม่')
+        return render(request, 'appointments/equipment_import.html')
 
     context = {
         'created': created,
@@ -1392,10 +1546,15 @@ def technician_list(request):
     today = date.today()
     technicians = (Technician.objects
                    .filter(is_active=True)
-                   .prefetch_related('skills', 'work_days'))
+                   .prefetch_related('skills', 'work_days',
+                                     Prefetch('leaves', queryset=TechnicianLeave.objects.filter(leave_date=today))))
+    today_counts = dict(
+        Appointment.objects.filter(scheduled_date=today)
+        .values_list('technician_id').annotate(total=Count('pk'))
+    )
     for tech in technicians:
         tech.available_today = tech.is_available_on(today)
-        tech.today_count = tech.appointments.filter(scheduled_date=today).count()
+        tech.today_count = today_counts.get(tech.pk, 0)
     context = {'technicians': technicians, 'today': today}
     return render(request, 'appointments/technician_list.html', context)
 
@@ -1506,7 +1665,7 @@ def technician_skill(request):
         .order_by('employee_id')
     )
     tech_skill_ids = {
-        tech.pk: set(tech.skills.values_list('pk', flat=True))
+        tech.pk: {s.pk for s in tech.skills.all()}
         for tech in technicians
     }
 

@@ -96,9 +96,9 @@ class EquipmentForm(forms.ModelForm):
             'maintenance_interval_months': forms.NumberInput(
                 attrs={'class': 'form-control', 'min': 1}),
             'last_maintenance_date': forms.DateInput(
-                attrs={'class': 'form-control', 'type': 'date'}),
+                format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'}),
             'next_maintenance_date': forms.DateInput(
-                attrs={'class': 'form-control', 'type': 'date'}),
+                format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'}),
             'maintenance_required_skills': forms.CheckboxSelectMultiple(),
             'requires_calibration': forms.CheckboxInput(
                 attrs={'class': 'form-check-input', 'id': 'id_requires_calibration',
@@ -108,9 +108,9 @@ class EquipmentForm(forms.ModelForm):
             'calibration_interval_months': forms.NumberInput(
                 attrs={'class': 'form-control', 'min': 1}),
             'last_calibration_date': forms.DateInput(
-                attrs={'class': 'form-control', 'type': 'date'}),
+                format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'}),
             'next_calibration_date': forms.DateInput(
-                attrs={'class': 'form-control', 'type': 'date'}),
+                format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'}),
             'calibration_required_skills': forms.CheckboxSelectMultiple(),
             'repair_required_skills': forms.CheckboxSelectMultiple(),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
@@ -212,7 +212,7 @@ class TechnicianLeaveForm(forms.ModelForm):
         fields = ['technician', 'leave_date', 'leave_type', 'reason']
         widgets = {
             'technician': forms.Select(attrs={'class': 'form-select'}),
-            'leave_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'leave_date': forms.DateInput(format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'}),
             'leave_type': forms.Select(attrs={'class': 'form-select'}),
             'reason': forms.TextInput(attrs={'class': 'form-control'}),
         }

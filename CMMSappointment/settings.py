@@ -116,3 +116,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Bootstrap has no `alert-error`; map Django's error level to `alert-danger`
+from django.contrib.messages import constants as message_constants  # noqa: E402
+MESSAGE_TAGS = {message_constants.ERROR: 'danger'}

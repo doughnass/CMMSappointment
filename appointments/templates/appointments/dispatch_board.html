@@ -1,45 +1,10 @@
 {% extends "appointments/base.html" %}
+{% load static %}
 {% block title %}กระดานจ่ายงาน – CMMS{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item active">กระดานจ่ายงาน</li>{% endblock %}
 
 {% block extra_head %}
-<style>
-  .dispatch-row { transition: box-shadow .15s; }
-  .dispatch-row:hover { box-shadow: 0 2px 12px rgba(0,0,0,.10); }
-  .tech-col { width: 200px; flex-shrink: 0; }
-  .timeline-wrap {
-    position: relative; height: 44px;
-    background: #f0f4f8; border-radius: 6px; overflow: hidden;
-    flex: 1;
-  }
-  .timeline-wrap.unavailable {
-    background: repeating-linear-gradient(
-      45deg, transparent, transparent 6px,
-      rgba(0,0,0,.04) 6px, rgba(0,0,0,.04) 12px
-    );
-  }
-  .apt-block {
-    position: absolute; top: 4px; bottom: 4px;
-    border-radius: 4px; border-left: 3px solid;
-    display: flex; align-items: center;
-    padding: 0 5px; overflow: hidden;
-    cursor: pointer; transition: opacity .15s;
-  }
-  .apt-block:hover { opacity: .85; }
-  .apt-block span { font-size: .68rem; white-space: nowrap; overflow: hidden; }
-  .hour-marker {
-    position: absolute; top: 0; bottom: 0;
-    width: 1px; background: rgba(0,0,0,.08);
-  }
-  .hour-label {
-    position: absolute; top: -18px;
-    font-size: .6rem; color: #adb5bd;
-    transform: translateX(-50%);
-  }
-  .capacity-bar { height: 6px; border-radius: 3px; background: #e9ecef; overflow: hidden; }
-  .capacity-fill { height: 100%; border-radius: 3px; transition: width .3s; }
-  .status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-</style>
+<link href="{% static 'appointments/css/dispatch_board.css' %}" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -98,6 +63,7 @@
 </div>
 
 <!-- ── Timeline header ruler ── -->
+<div class="dispatch-scroll">
 <div class="card mb-2">
   <div class="card-body py-2 px-3">
     <div class="d-flex align-items-center gap-3">
@@ -186,7 +152,8 @@
                     background:{{ row.tech.color }}30;
                     border-left-color:{{ row.tech.color }}"
              onclick="location.href='{% url 'appointments:appointment_detail' block.apt.pk %}'"
-             title="{{ block.apt.equipment.name }} | {{ block.apt.start_time|time:'H:i' }}–{{ block.apt.end_time|time:'H:i' }} | {{ block.apt.equipment.customer.name }}">
+             title="{{ block.apt.equipment.name }} | {{ block.apt.start_time|time:'H:i' }}–{{ block.apt.end_time|time:'H:i' }} | {{ block.apt.equipment.customer.name }}"
+             aria-label="{{ block.apt.equipment.name }} {{ block.apt.start_time|time:'H:i' }}–{{ block.apt.end_time|time:'H:i' }}">
           <span style="color:{{ row.tech.color }}">{{ block.apt.equipment.name }}</span>
         </div>
         {% endfor %}
@@ -225,6 +192,7 @@
 {% empty %}
 <div class="card"><div class="card-body text-center text-muted py-5">ยังไม่มีช่างในระบบ</div></div>
 {% endfor %}
+</div><!-- /dispatch-scroll -->
 
 {% if ot_rows %}
 <!-- ── OT Section ── -->
@@ -287,7 +255,8 @@
                style="left:{{ block.left }}%;width:{{ block.width }}%;
                       background:{{ row.tech.color }}30;border-left-color:{{ row.tech.color }}"
                onclick="location.href='{% url 'appointments:appointment_detail' block.apt.pk %}'"
-               title="{{ block.apt.equipment.name }} | {{ block.apt.start_time|time:'H:i' }}–{{ block.apt.end_time|time:'H:i' }}">
+               title="{{ block.apt.equipment.name }} | {{ block.apt.start_time|time:'H:i' }}–{{ block.apt.end_time|time:'H:i' }}"
+               aria-label="{{ block.apt.equipment.name }} {{ block.apt.start_time|time:'H:i' }}–{{ block.apt.end_time|time:'H:i' }}">
             <span style="color:{{ row.tech.color }}">{{ block.apt.equipment.name }}</span>
           </div>
           {% endfor %}

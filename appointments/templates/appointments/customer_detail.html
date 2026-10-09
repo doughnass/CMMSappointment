@@ -83,7 +83,8 @@
       <div class="card-header d-flex align-items-center justify-content-between">
         <span class="small fw-600"><i class="bi bi-people me-2 text-primary"></i>ผู้ติดต่อ</span>
         <button class="btn btn-outline-primary btn-sm py-0" type="button"
-                data-bs-toggle="collapse" data-bs-target="#collapseAddContact">
+                data-bs-toggle="collapse" data-bs-target="#collapseAddContact"
+                aria-controls="collapseAddContact" aria-label="เพิ่มผู้ติดต่อ" title="เพิ่มผู้ติดต่อ">
           <i class="bi bi-plus"></i>
         </button>
       </div>
@@ -131,9 +132,9 @@
               {% if ct.email %}<div><i class="bi bi-envelope text-muted me-1"></i>{{ ct.email }}</div>{% endif %}
             </div>
             <form method="post" action="{% url 'appointments:customer_contact_delete' customer.pk ct.pk %}"
-                  onsubmit="return confirm('ลบผู้ติดต่อนี้?')">
+                  data-confirm="ลบผู้ติดต่อนี้?">
               {% csrf_token %}
-              <button type="submit" class="btn btn-link btn-sm text-danger p-0">
+              <button type="submit" class="btn btn-link btn-sm text-danger p-0" title="ลบผู้ติดต่อ" aria-label="ลบผู้ติดต่อ">
                 <i class="bi bi-x-circle"></i>
               </button>
             </form>

@@ -1,0 +1,27 @@
+.fc .fc-toolbar-title { font-family: 'Sarabun', sans-serif; font-size: 1.1rem; }
+.fc .fc-button { font-family: 'Sarabun', sans-serif; }
+.fc-timegrid-event .fc-event-title { white-space: pre-wrap; font-size: .78rem; }
+.fc-bg-event { opacity: .07 !important; }
+/* overtime (non-business-hours) tint */
+.fc-non-business { background: #fff8e8 !important; }
+
+/* technician filter */
+.tech-badge { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px; font-size:.82rem; cursor:pointer; border:2px solid transparent; user-select:none; }
+.tech-badge.inactive { opacity:.4; }
+.tech-badge:focus-visible { outline: 3px solid #0d6efd; outline-offset: 2px; }
+.tech-badge[aria-pressed="true"] { box-shadow: 0 0 0 2px rgba(13,110,253,.25); }
+.tech-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+#event-modal .modal-body dt { font-weight:600; color:#555; min-width:120px; }
+#event-modal .modal-body dd { margin-bottom:.35rem; }
+
+.calendar-wrap { position: relative; background:#fff; border-radius:12px; padding:18px; box-shadow:0 1px 6px rgba(0,0,0,.07); }
+.filter-bar { background:#fff; border-radius:12px; padding:14px 18px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:16px; }
+#calendar-loading { position:absolute; inset:0; background:rgba(255,255,255,.65); z-index:5; display:none; align-items:center; justify-content:center; border-radius:12px; }
+#calendar-loading.show { display:flex; }
+
+@media (max-width: 767.98px) {
+  .calendar-wrap { padding: 8px; }
+  .fc .fc-toolbar { flex-direction: column; gap: .5rem; }
+  .fc .fc-toolbar-title { font-size: 1rem; }
+}

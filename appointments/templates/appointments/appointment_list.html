@@ -69,7 +69,20 @@
       <div class="col-4 col-md-2 d-flex align-items-end gap-1">
         <a href="{% url 'appointments:appointment_list' %}" class="btn btn-outline-secondary btn-sm w-100">ล้าง</a>
       </div>
+      {% if request.GET.sort %}<input type="hidden" name="sort" value="{{ request.GET.sort }}">{% endif %}
+      {% if request.GET.dir %}<input type="hidden" name="dir" value="{{ request.GET.dir }}">{% endif %}
     </form>
+    {% if filter_chips %}
+    <div class="d-flex flex-wrap align-items-center gap-2 mt-2 pt-2 border-top" aria-label="ตัวกรองที่ใช้อยู่">
+      <span class="small text-muted">กรองโดย:</span>
+      {% for chip in filter_chips %}
+      <a href="{{ chip.remove_url }}" class="badge rounded-pill text-bg-light border text-decoration-none fw-normal py-2 px-3"
+         title="เอาตัวกรองนี้ออก" aria-label="เอาตัวกรอง {{ chip.label }} {{ chip.value }} ออก">
+        {{ chip.label }}: <strong>{{ chip.value }}</strong> <i class="bi bi-x-lg ms-1"></i>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
   </div>
 </div>
 
@@ -86,19 +99,28 @@
     </a>
   </div>
   <div class="card-body p-0">
-    <div class="table-responsive">
+    <div class="table-responsive d-none d-md-block">
       <table class="table table-hover align-middle mb-0 small">
         <thead class="table-light">
           <tr>
-            <th>เลขที่</th>
-            <th>วันที่ / เวลา</th>
-            <th>ช่าง</th>
-            <th>เครื่องมือ</th>
-            <th>โรงพยาบาล</th>
-            <th>ประเภท</th>
-            <th>ช่วงเวลา</th>
-            <th>สถานะ</th>
-            <th></th>
+            {% for h in sort_headers %}
+            {% if h.key == 'no' or h.key == 'date' or h.key == 'technician' or h.key == 'equipment' or h.key == 'customer' or h.key == 'service' %}
+            <th scope="col" {% if h.active %}aria-sort="{% if h.dir == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}>
+              <a href="{% querystring sort=h.key dir=h.next_dir page=None %}" class="text-decoration-none text-reset text-nowrap">
+                {{ h.label }}{% if h.active %}<i class="bi bi-caret-{% if h.dir == 'asc' %}up{% else %}down{% endif %}-fill ms-1 text-primary"></i>{% else %}<i class="bi bi-chevron-expand ms-1 text-muted opacity-50"></i>{% endif %}
+              </a>
+            </th>
+            {% endif %}
+            {% endfor %}
+            <th scope="col">ช่วงเวลา</th>
+            {% for h in sort_headers %}{% if h.key == 'status' %}
+            <th scope="col" {% if h.active %}aria-sort="{% if h.dir == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}>
+              <a href="{% querystring sort=h.key dir=h.next_dir page=None %}" class="text-decoration-none text-reset text-nowrap">
+                {{ h.label }}{% if h.active %}<i class="bi bi-caret-{% if h.dir == 'asc' %}up{% else %}down{% endif %}-fill ms-1 text-primary"></i>{% else %}<i class="bi bi-chevron-expand ms-1 text-muted opacity-50"></i>{% endif %}
+              </a>
+            </th>
+            {% endif %}{% endfor %}
+            <th scope="col"><span class="visually-hidden">จัดการ</span></th>
           </tr>
         </thead>
         <tbody>
@@ -145,13 +167,13 @@
               </span>
             </td>
             <td class="text-nowrap">
-              <a href="{% url 'appointments:appointment_update' apt.pk %}" class="btn btn-xs btn-outline-secondary btn-sm py-0 px-2">
+              <a href="{% url 'appointments:appointment_update' apt.pk %}" class="btn btn-xs btn-outline-secondary btn-sm py-0 px-2" title="แก้ไขนัดหมาย" aria-label="แก้ไขนัดหมาย {{ apt.appointment_no }}">
                 <i class="bi bi-pencil"></i>
               </a>
               <form method="post" action="{% url 'appointments:appointment_delete' apt.pk %}" class="d-inline"
-                    onsubmit="return confirm('ยืนยันลบนัดหมาย {{ apt.appointment_no }}?')">
+                    data-confirm="ยืนยันลบนัดหมาย {{ apt.appointment_no }}?">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="ลบนัดหมาย">
+                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="ลบนัดหมาย" aria-label="ลบนัดหมาย {{ apt.appointment_no }}">
                   <i class="bi bi-trash"></i>
                 </button>
               </form>
@@ -166,6 +188,47 @@
           {% endfor %}
         </tbody>
       </table>
+    </div>
+
+    <!-- Mobile card view -->
+    <div class="d-md-none list-group list-group-flush">
+      {% for apt in appointments %}
+      <div class="list-group-item">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <a href="{% url 'appointments:appointment_detail' apt.pk %}" class="fw-600 text-decoration-none">{{ apt.appointment_no }}</a>
+          <span class="badge bg-{% if apt.status == 'completed' %}success{% elif apt.status == 'cancelled' %}secondary{% elif apt.status == 'in_progress' %}warning{% elif apt.status == 'confirmed' %}info{% else %}primary{% endif %}">
+            {{ apt.get_status_display }}
+          </span>
+        </div>
+        <div class="mt-1">{{ apt.equipment.name }}</div>
+        <div class="small text-muted">{{ apt.equipment.customer.name }}</div>
+        <div class="small mt-1">
+          <i class="bi bi-calendar-event me-1"></i>{{ apt.scheduled_date|date:"d/m/Y" }} {{ apt.start_time|time:"H:i" }}–{{ apt.end_time|time:"H:i" }}
+        </div>
+        <div class="small mt-1 d-flex flex-wrap align-items-center gap-1">
+          <span class="rounded-circle d-inline-block" style="width:8px;height:8px;background:{{ apt.technician.color }}"></span>
+          {{ apt.technician.first_name }}
+          <span class="badge bg-{% if apt.service_type == 'PM' %}success{% elif apt.service_type == 'CAL' %}info{% elif apt.service_type == 'PM_CAL' %}primary{% else %}warning{% endif %}">{{ apt.service_type }}</span>
+          {% if apt.time_type == 'overtime_wday' or apt.time_type == 'overtime' %}
+          <span class="badge badge-overtime">นอกเวลา</span>
+          {% elif apt.time_type == 'overtime_wknd' %}
+          <span class="badge badge-weekend">เสาร์/อาทิตย์</span>
+          {% endif %}
+        </div>
+        <div class="d-flex gap-2 mt-2">
+          <a href="{% url 'appointments:appointment_detail' apt.pk %}" class="btn btn-sm btn-outline-primary flex-fill">รายละเอียด</a>
+          <a href="{% url 'appointments:appointment_update' apt.pk %}" class="btn btn-sm btn-outline-secondary" aria-label="แก้ไขนัดหมาย {{ apt.appointment_no }}"><i class="bi bi-pencil"></i></a>
+          <form method="post" action="{% url 'appointments:appointment_delete' apt.pk %}" data-confirm="ยืนยันลบนัดหมาย {{ apt.appointment_no }}?">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="ลบนัดหมาย {{ apt.appointment_no }}"><i class="bi bi-trash"></i></button>
+          </form>
+        </div>
+      </div>
+      {% empty %}
+      <div class="list-group-item text-center text-muted py-5">
+        <i class="bi bi-inbox fs-2 d-block mb-2"></i>ไม่พบนัดหมาย
+      </div>
+      {% endfor %}
     </div>
   </div>
   {% if page_obj.paginator.num_pages > 1 %}

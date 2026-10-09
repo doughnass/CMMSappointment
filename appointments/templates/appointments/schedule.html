@@ -1,25 +1,11 @@
 {% extends "appointments/base.html" %}
+{% load static %}
 {% block title %}ตารางนัดหมาย – CMMS{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item active">ตารางนัดหมาย</li>{% endblock %}
 
 {% block extra_head %}
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
-<style>
-  .fc .fc-toolbar-title { font-family: 'Sarabun', sans-serif; font-size: 1.1rem; }
-  .fc .fc-button { font-family: 'Sarabun', sans-serif; }
-  .fc-timegrid-event .fc-event-title { white-space: pre-wrap; font-size: .78rem; }
-  .fc-bg-event { opacity: .07 !important; }
-  /* overtime (non-business-hours) tint */
-  .fc-non-business { background: #fff8e8 !important; }
-  /* legend */
-  .tech-badge { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px; font-size:.82rem; cursor:pointer; border:2px solid transparent; user-select:none; }
-  .tech-badge.inactive { opacity:.4; }
-  .tech-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
-  #event-modal .modal-body dt { font-weight:600; color:#555; min-width:120px; }
-  #event-modal .modal-body dd { margin-bottom:.35rem; }
-  .calendar-wrap { background:#fff; border-radius:12px; padding:18px; box-shadow:0 1px 6px rgba(0,0,0,.07); }
-  .filter-bar { background:#fff; border-radius:12px; padding:14px 18px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:16px; }
-</style>
+<link href="{% static 'appointments/css/schedule.css' %}" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -27,17 +13,17 @@
 <!-- ── Filter bar ── -->
 <div class="filter-bar d-flex flex-wrap align-items-center gap-3">
   <span class="fw-600 me-2"><i class="bi bi-funnel me-1"></i>กรองช่าง:</span>
-  <span class="tech-badge" data-tech="all"
+  <button type="button" class="tech-badge fw-bold" data-tech="all" aria-pressed="true"
         style="background:#0d6efd22;border-color:#0d6efd;color:#0d6efd" id="btn-all">
     <span class="tech-dot" style="background:#0d6efd"></span> ทั้งหมด
-  </span>
+  </button>
   {% for tech in technicians %}
-  <span class="tech-badge" data-tech="{{ tech.pk }}"
+  <button type="button" class="tech-badge" data-tech="{{ tech.pk }}" aria-pressed="false"
         style="background:{{ tech.color }}22;border-color:{{ tech.color }};color:#333"
         id="btn-tech-{{ tech.pk }}">
     <span class="tech-dot" style="background:{{ tech.color }}"></span>
     {{ tech.first_name }} {{ tech.last_name }}
-  </span>
+  </button>
   {% endfor %}
 
   <div class="ms-auto d-flex gap-2 align-items-center">
@@ -57,17 +43,28 @@
 </div>
 
 <!-- ── Calendar ── -->
+<div id="calendar-error" class="alert alert-danger d-none align-items-center justify-content-between gap-2 py-2" role="alert">
+  <span><i class="bi bi-exclamation-triangle-fill me-1"></i>โหลดข้อมูลนัดหมายไม่สำเร็จ</span>
+  <button type="button" class="btn btn-sm btn-outline-danger" id="calendar-retry">ลองอีกครั้ง</button>
+</div>
+<div id="calendar-empty" class="alert alert-light border d-none py-2 small text-muted" role="status">
+  <i class="bi bi-inbox me-1"></i>ไม่มีนัดหมายในช่วงเวลานี้
+</div>
 <div class="calendar-wrap">
-  <div id="calendar"></div>
+  <div id="calendar-loading" role="status" aria-live="polite">
+    <div class="spinner-border text-primary" aria-hidden="true"></div>
+    <span class="visually-hidden">กำลังโหลด…</span>
+  </div>
+  <div id="calendar" data-events-url="{% url 'appointments:api_appointments' %}"></div>
 </div>
 
 <!-- ── Event Detail Modal ── -->
-<div class="modal fade" id="event-modal" tabindex="-1">
+<div class="modal fade" id="event-modal" tabindex="-1" aria-labelledby="modal-title" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header py-2" id="modal-header">
         <h6 class="modal-title" id="modal-title">รายละเอียดนัดหมาย</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
       </div>
       <div class="modal-body">
         <dl class="row mb-0" id="modal-body-dl"></dl>
@@ -87,107 +84,5 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/th.js"></script>
-<script>
-(function () {
-  let selectedTech = 'all';
-
-  // ── Calendar init ──
-  const calEl = document.getElementById('calendar');
-  const calendar = new FullCalendar.Calendar(calEl, {
-    locale: 'th',
-    initialView: 'timeGridWeek',
-    height: 'auto',
-    slotMinTime: '06:00',
-    slotMaxTime: '22:00',
-    slotDuration: '00:30',
-    slotLabelInterval: '01:00',
-    slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
-    eventTimeFormat:  { hour: '2-digit', minute: '2-digit', hour12: false },
-    allDaySlot: false,
-    nowIndicator: true,
-    weekNumbers: false,
-    businessHours: {
-      daysOfWeek: [1, 2, 3, 4, 5],
-      startTime: '08:30',
-      endTime: '16:30',
-    },
-    headerToolbar: {
-      left:   'prev,next today',
-      center: 'title',
-      right:  'dayGridMonth,timeGridWeek,timeGridDay',
-    },
-    buttonText: {
-      today: 'วันนี้',
-      month: 'เดือน',
-      week:  'สัปดาห์',
-      day:   'วัน',
-    },
-    events: function (info, successCb, failureCb) {
-      const params = new URLSearchParams({
-        start: info.startStr,
-        end:   info.endStr,
-        technician: selectedTech,
-      });
-      fetch(`{% url 'appointments:api_appointments' %}?${params}`)
-        .then(r => r.json())
-        .then(successCb)
-        .catch(failureCb);
-    },
-    eventClick: function (info) {
-      showEventModal(info.event);
-    },
-    eventDidMount: function (info) {
-      // Dashed border for overtime
-      if (info.event.extendedProps.is_overtime) {
-        info.el.style.borderStyle = 'dashed';
-        info.el.style.borderWidth = '2px';
-      }
-    },
-  });
-  calendar.render();
-
-  // ── Tech filter buttons ──
-  document.querySelectorAll('.tech-badge').forEach(btn => {
-    btn.addEventListener('click', function () {
-      document.querySelectorAll('.tech-badge').forEach(b => b.classList.remove('fw-bold'));
-      this.classList.add('fw-bold');
-      selectedTech = this.dataset.tech;
-      calendar.refetchEvents();
-    });
-  });
-
-  // ── Overtime toggle ──
-  document.getElementById('toggle-overtime').addEventListener('change', function () {
-    calendar.refetchEvents();
-  });
-
-  // ── Event modal ──
-  function showEventModal(event) {
-    const p = event.extendedProps;
-    document.getElementById('modal-title').textContent =
-      `${p.appointment_no} – ${p.service_type}`;
-    document.getElementById('modal-header').style.borderLeftColor = event.backgroundColor;
-    document.getElementById('modal-header').style.borderLeftWidth = '4px';
-    document.getElementById('modal-header').style.borderLeftStyle = 'solid';
-
-    const rows = [
-      ['เครื่องมือ',   p.equipment],
-      ['Serial No.',   p.serial_number],
-      ['โรงพยาบาล',   p.customer],
-      ['แผนก',        p.department || '–'],
-      ['ช่าง',         p.technician],
-      ['ประเภทงาน',   p.service_type],
-      ['ช่วงเวลา',    `<span class="badge ${p.is_overtime ? 'badge-overtime' : 'badge-office'}">${p.time_type}</span>`],
-      ['ระยะเวลา',    `${p.duration} นาที`],
-      ['สถานะ',       p.status],
-      ['หมายเหตุ',    p.notes || '–'],
-    ];
-    document.getElementById('modal-body-dl').innerHTML = rows
-      .map(([k, v]) => `<dt class="col-5">${k}</dt><dd class="col-7 mb-1">${v}</dd>`)
-      .join('');
-    document.getElementById('modal-detail-btn').href = p.detail_url;
-    new bootstrap.Modal(document.getElementById('event-modal')).show();
-  }
-})();
-</script>
+<script src="{% static 'appointments/js/schedule.js' %}"></script>
 {% endblock %}

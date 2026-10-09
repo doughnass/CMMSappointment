@@ -1,6 +1,10 @@
-from django.db import models
+from django.core.exceptions import ValidationError
+from django.db import models, transaction
 from datetime import date
-from .utils import add_months, is_office_hours, detect_time_type
+from .utils import (
+    add_months, is_office_hours, detect_time_type,
+    OFFICE_HOURS_START, OFFICE_HOURS_END, OT_WEEKDAY_START, OT_WEEKDAY_END,
+)
 
 
 class Skill(models.Model):
@@ -47,13 +51,29 @@ class Technician(models.Model):
     def __str__(self):
         return f"{self.employee_id} - {self.full_name}"
 
+    def _prefetched(self, name):
+        return name in getattr(self, '_prefetched_objects_cache', {})
+
+    def works_on_weekday(self, weekday):
+        """True if `weekday` (Mon=0) is a regular work day. Uses prefetched work_days when present."""
+        if self._prefetched('work_days'):
+            return any(wd.day_of_week == weekday for wd in self.work_days.all())
+        return self.work_days.filter(day_of_week=weekday).exists()
+
+    def has_leave_on(self, check_date):
+        """True if there is a leave record on check_date. Uses prefetched leaves when present
+        (callers should prefetch only the dates they need, not the whole leave history)."""
+        if self._prefetched('leaves'):
+            return any(lv.leave_date == check_date for lv in self.leaves.all())
+        return self.leaves.filter(leave_date=check_date).exists()
+
     def is_available_on(self, check_date):
         """Return True if the technician is scheduled to work and has no leave on check_date."""
         if not self.is_active:
             return False
-        if not self.work_days.filter(day_of_week=check_date.weekday()).exists():
+        if not self.works_on_weekday(check_date.weekday()):
             return False
-        return not self.leaves.filter(leave_date=check_date).exists()
+        return not self.has_leave_on(check_date)
 
 
 class TechnicianWorkDay(models.Model):
@@ -395,6 +415,10 @@ class Appointment(models.Model):
         verbose_name = 'การนัดหมาย'
         verbose_name_plural = 'การนัดหมาย'
         ordering = ['scheduled_date', 'start_time']
+        indexes = [
+            models.Index(fields=['scheduled_date'], name='apt_date_idx'),
+            models.Index(fields=['technician', 'scheduled_date'], name='apt_tech_date_idx'),
+        ]
 
     def __str__(self):
         return f"{self.appointment_no} - {self.equipment.name} ({self.scheduled_date})"
@@ -416,8 +440,105 @@ class Appointment(models.Model):
         self.time_type = detect_time_type(self.scheduled_date, self.start_time)
         super().save(*args, **kwargs)
 
+    # Statuses in which an appointment can still be received, assigned or completed
+    OPEN_STATUSES = ('scheduled', 'confirmed', 'in_progress')
+
+    @property
+    def is_open(self):
+        return self.status in self.OPEN_STATUSES
+
+    def _scheduling_changed(self, original):
+        """True for new records, re-activated ones, or when any scheduling field changed."""
+        if original is None:
+            return True
+        fields = ('technician_id', 'equipment_id', 'scheduled_date',
+                  'start_time', 'end_time', 'duration_minutes')
+        if any(original[f] != getattr(self, f) for f in fields):
+            return True
+        return original['status'] == 'cancelled' and self.status != 'cancelled'
+
+    def clean(self):
+        """Server-side scheduling rules shared by the forms and the admin.
+
+        Rules only run for new/re-scheduled appointments so that editing notes on
+        historical records is never blocked by data that was valid when it was saved.
+        """
+        super().clean()
+        if not all([self.technician_id, self.equipment_id, self.scheduled_date,
+                    self.start_time, self.end_time]):
+            return
+        start = self.start_time.hour * 60 + self.start_time.minute
+        end = self.end_time.hour * 60 + self.end_time.minute
+        if end <= start:
+            return  # reported by the form
+
+        original = None
+        if self.pk:
+            original = Appointment.objects.filter(pk=self.pk).values(
+                'technician_id', 'equipment_id', 'scheduled_date', 'start_time',
+                'end_time', 'duration_minutes', 'status').first()
+        if self.status == 'cancelled' or not self._scheduling_changed(original):
+            return
+
+        errors = []
+        tech, equipment, day = self.technician, self.equipment, self.scheduled_date
+
+        if self.duration_minutes != end - start:
+            errors.append(
+                f'ระยะเวลา {self.duration_minutes} นาที ไม่ตรงกับเวลาเริ่ม–สิ้นสุด ({end - start} นาที)')
+
+        if (original is None or original['technician_id'] != self.technician_id) and not tech.is_active:
+            errors.append(f'ช่าง {tech.full_name} ถูกปิดการใช้งานแล้ว')
+        if (original is None or original['equipment_id'] != self.equipment_id) and not equipment.is_active:
+            errors.append(f'เครื่องมือ {equipment.name} ถูกปิดการใช้งานแล้ว')
+
+        if tech.leaves.filter(leave_date=day).exists():
+            errors.append(f'ช่าง {tech.full_name} ลา/ไม่อยู่ในวันที่ {day:%d/%m/%Y}')
+
+        # Each appointment must fit one session: office hours or a registered overtime session
+        time_type = detect_time_type(day, self.start_time)
+        on_work_day = tech.work_days.filter(day_of_week=day.weekday()).exists()
+        if time_type == 'overtime_wday':
+            window, regular, label = (OT_WEEKDAY_START, OT_WEEKDAY_END), False, 'นอกเวลา จ.-ศ.'
+        elif time_type == 'overtime_wknd':
+            window, regular, label = (OFFICE_HOURS_START, OFFICE_HOURS_END), on_work_day, 'เสาร์/อาทิตย์'
+        else:
+            window, regular, label = (OFFICE_HOURS_START, OFFICE_HOURS_END), on_work_day, 'เวลาราชการ'
+
+        if not regular and not tech.overtime_days.filter(date=day).exists():
+            errors.append(
+                f'ช่าง {tech.full_name} ไม่ได้อยู่เวรหรือยังไม่ได้ลงทะเบียนวันนอกเวลาในวันที่ '
+                f'{day:%d/%m/%Y} ({label}) กรุณาลงทะเบียนวันนอกเวลาของช่างก่อนจอง')
+        window_start = window[0][0] * 60 + window[0][1]
+        window_end = window[1][0] * 60 + window[1][1]
+        if start < window_start or end > window_end:
+            errors.append(
+                f'เวลา {self.start_time:%H:%M}–{self.end_time:%H:%M} อยู่นอกช่วง{label} '
+                f'({window_start // 60:02d}:{window_start % 60:02d}–{window_end // 60:02d}:{window_end % 60:02d}) '
+                'นัดหมายต้องอยู่ภายในช่วงเดียวกัน')
+
+        conflicts = Appointment.objects.filter(
+            technician=tech, scheduled_date=day,
+            start_time__lt=self.end_time, end_time__gt=self.start_time,
+        ).exclude(status='cancelled')
+        if self.pk:
+            conflicts = conflicts.exclude(pk=self.pk)
+        conflict = conflicts.order_by('start_time').first()
+        if conflict:
+            errors.append(
+                f'ช่าง {tech.full_name} มีนัดหมาย {conflict.appointment_no} '
+                f'เวลา {conflict.start_time:%H:%M}–{conflict.end_time:%H:%M} ในวันที่เลือกแล้ว '
+                'ไม่สามารถจองเวลาซ้อนกันได้ กรุณาเลือกเวลาหรือช่างคนอื่น')
+
+        if errors:
+            raise ValidationError(errors)
+
+    @transaction.atomic
     def mark_completed(self, completion_date, notes=''):
         """Complete this appointment and update the equipment service registry."""
+        if not self.is_open:
+            raise ValidationError(
+                f'ไม่สามารถบันทึกเสร็จสิ้นได้ นัดหมายนี้อยู่ในสถานะ "{self.get_status_display()}"')
         self.status = 'completed'
         self.actual_completion_date = completion_date
         self.completion_notes = notes

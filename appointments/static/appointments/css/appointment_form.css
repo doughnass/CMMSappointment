@@ -1,0 +1,62 @@
+:root { --form-ink: #17324d; --form-accent: #0d6efd; --form-soft: #f4f8fc; }
+.appointment-intro { border-left: 4px solid var(--form-accent); padding-left: 14px; }
+.appointment-intro h1 { color: var(--form-ink); letter-spacing: 0; }
+.flow-nav { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.flow-step { background: #fff; border: 1px solid #dbe5ef; border-radius: 999px; color: #64748b; font-size: .8rem; padding: 7px 12px; white-space: nowrap; }
+.flow-step.active { background: #e8f1ff; border-color: #9fc2ff; color: #0757bd; font-weight: 600; }
+.form-section-title { color: var(--form-ink); font-size: 1rem; margin-top: 1.5rem; }
+.form-section-title:first-of-type { margin-top: 0; }
+.form-section-title .badge { align-items: center; display: inline-flex; height: 25px; justify-content: center; min-width: 25px !important; }
+.field-label { color: #334155; }
+.field-help { color: #64748b; font-size: .78rem; }
+#equipment-info { background: var(--form-soft); border-radius: 6px; padding: 7px 10px; }
+.time-panel { background: var(--form-soft); border: 1px solid #e2eaf3; border-radius: 8px; padding: 12px; }
+.form-actions { border-top: 1px solid #e2e8f0; margin-top: 1.5rem; padding-top: 1rem; }
+.summary-card { border-top: 4px solid var(--form-accent); }
+.summary-card .list-group-item { border-color: #edf1f5; }
+.summary-value { overflow-wrap: anywhere; }
+.availability-indicator { height: 10px; width: 10px; border-radius: 50%; display:inline-block; }
+.calendar-legend { font-size: .78rem; }
+.calendar-legend .legend-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; vertical-align: middle; margin-right: 4px; border: 1px solid rgba(0,0,0,.1); }
+.flatpickr-day.day-available { background: #d1f7dd !important; border-color: #28a745 !important; color: #1e7e34 !important; }
+.flatpickr-day.day-limited   { background: #fff3cd !important; border-color: #fd7e14 !important; color: #a15c00 !important; }
+.flatpickr-day.day-full      { background: #f8d7da !important; border-color: #dc3545 !important; color: #a71d2a !important; }
+.flatpickr-day.day-closed    { background: #e9ecef !important; border-color: #adb5bd !important; color: #868e96 !important; }
+.flatpickr-day.selected.day-available,
+.flatpickr-day.selected.day-limited,
+.flatpickr-day.selected.day-full,
+.flatpickr-day.selected.day-closed { background: #0d6efd !important; border-color: #0d6efd !important; color: #fff !important; }
+.busy-slot { background: #fee2e2; border-radius: 6px; padding: 4px 8px; font-size: .8rem; margin: 2px 0; }
+#availability-info { min-height: 40px; }
+.time-type-badge { font-size: .85rem; padding: 4px 12px; border-radius: 20px; }
+#equipment-search-results {
+  position: absolute; z-index: 20; width: 100%; max-height: 280px; overflow-y: auto;
+  background: #fff; border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 10px rgba(0,0,0,.08);
+}
+#equipment-search-results .result-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f1f1f1; }
+#equipment-search-results .result-item:hover,
+#equipment-search-results .result-item:focus { background: #f0f7ff; outline: none; }
+#equipment-search-results .result-item:last-child { border-bottom: none; }
+.tech-suggest-card {
+  border: 1px solid #dee2e6; border-radius: 8px; padding: 10px 12px; cursor: pointer;
+  transition: box-shadow .15s, border-color .15s;
+}
+.tech-suggest-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.tech-suggest-card:focus-visible { outline: 3px solid #0d6efd; outline-offset: 2px; }
+.tech-suggest-card.selected { border-color: #0d6efd; background: #f0f7ff; }
+.tech-suggest-card.unavailable { opacity: .55; }
+.capacity-badge { font-size: .75rem; }
+.ai-recommendation { background: #eef8f5; border: 1px solid #a9ddcc; border-left: 4px solid #159570; border-radius: 8px; padding: 12px 14px; }
+.ai-recommendation .recommendation-name { color: #106b55; font-size: 1rem; font-weight: 700; }
+.ai-recommendation.no-match { background: #fff4f2; border-color: #f0b8af; border-left-color: #dc3545; }
+.ai-recommendation.no-match .recommendation-name { color: #a5281c; }
+.date-recommendations { background: #fffaf0; border: 1px solid #f3d48b; border-radius: 8px; padding: 10px; }
+.date-recommendation { background: #fff; border: 1px solid #f0c36d; color: #815b12; font-size: .78rem; padding: 5px 9px; }
+
+@media (max-width: 767.98px) {
+  .appointment-intro { margin-bottom: 12px; }
+  .appointment-intro h1 { font-size: 1.35rem; }
+  .form-actions { position: sticky; bottom: 0; background: #fff; margin-left: -1rem; margin-right: -1rem; padding: 1rem; z-index: 10; }
+  .form-actions .btn { flex: 1; }
+}
